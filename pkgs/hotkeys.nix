@@ -1,6 +1,23 @@
 # ReShade keycode converter
 # Format: <VirtualKeyCode>,<Ctrl>,<Shift>,<Alt> (e.g. "117,0,1,0" for Shift+F6)
 let
+  toUpper = str:
+    let
+      chars = [
+        { from = "a"; to = "A"; } { from = "b"; to = "B"; } { from = "c"; to = "C"; }
+        { from = "d"; to = "D"; } { from = "e"; to = "E"; } { from = "f"; to = "F"; }
+        { from = "g"; to = "G"; } { from = "h"; to = "H"; } { from = "i"; to = "I"; }
+        { from = "j"; to = "J"; } { from = "k"; to = "K"; } { from = "l"; to = "L"; }
+        { from = "m"; to = "M"; } { from = "n"; to = "N"; } { from = "o"; to = "O"; }
+        { from = "p"; to = "P"; } { from = "q"; to = "Q"; } { from = "r"; to = "R"; }
+        { from = "s"; to = "S"; } { from = "t"; to = "T"; } { from = "u"; to = "U"; }
+        { from = "v"; to = "V"; } { from = "w"; to = "W"; } { from = "x"; to = "X"; }
+        { from = "y"; to = "Y"; } { from = "z"; to = "Z"; }
+      ];
+      replaceChar = acc: c: builtins.replaceStrings [c.from] [c.to] acc;
+    in
+      builtins.foldl' replaceChar str chars;
+
   keyMap = {
     # Function keys
     "F1" = 112;
@@ -44,7 +61,7 @@ let
     else let
       # Split by '+' or '-'
       parts = builtins.filter (x: builtins.isString x && x != "") (builtins.split "[+-]" input);
-      upperParts = map (p: builtins.toUpper p) parts;
+      upperParts = map (p: toUpper p) parts;
 
       hasCtrl = builtins.elem "CTRL" upperParts || builtins.elem "CONTROL" upperParts;
       hasShift = builtins.elem "SHIFT" upperParts;
