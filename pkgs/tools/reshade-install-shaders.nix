@@ -10,15 +10,15 @@ pkgs.writeShellScriptBin "reshade-install-shaders" ''
 
   show_help() {
     cat << HELP
-reshade-install-shaders - Instalador e sincronizador da biblioteca de shaders do ReShade
+reshade-install-shaders - Sync and manage ReShade shader library
 
-USO:
-  reshade-install-shaders [OPCOES]
+USAGE:
+  reshade-install-shaders [OPTIONS]
 
-OPCOES:
-  -s, --sync (padrao)   Sincroniza os shaders sem sobrescrever modificacoes locais
-  -f, --force           Restaura uma copia limpa de todos os shaders e texturas
-  -h, --help            Exibe esta ajuda
+OPTIONS:
+  -s, --sync (default)  Synchronize shaders without overwriting local modifications
+  -f, --force           Restore a fresh copy of all shaders and textures
+  -h, --help            Show this help message
 HELP
   }
 
@@ -35,10 +35,10 @@ HELP
   mkdir -p "$TARGET_DIR/Shaders" "$TARGET_DIR/Textures"
 
   if [ "$FORCE" -eq 1 ]; then
-    echo "-> Restaurando shaders e texturas (sobrescrevendo)..."
+    echo "Restoring shaders and textures (overwriting)..."
     cp -rf "$SRC_DIR"/* "$TARGET_DIR/"
   else
-    echo "-> Sincronizando shaders e texturas para $TARGET_DIR..."
+    echo "Synchronizing shaders and textures to $TARGET_DIR..."
     cp -rn "$SRC_DIR"/* "$TARGET_DIR/" 2>/dev/null || true
   fi
 
@@ -47,8 +47,8 @@ HELP
   shader_count=$(find "$TARGET_DIR/Shaders" -name "*.fx" 2>/dev/null | wc -l)
   texture_count=$(find "$TARGET_DIR/Textures" -type f 2>/dev/null | wc -l)
 
-  echo "==> Concluido com sucesso!"
-  echo "    Localizacao: $TARGET_DIR"
-  echo "    Efeitos (.fx) disponiveis: $shader_count"
-  echo "    Texturas/LUTs disponiveis:  $texture_count"
+  echo "Synchronization complete."
+  echo "  Location: $TARGET_DIR"
+  echo "  Available shaders (.fx): $shader_count"
+  echo "  Available textures/LUTs: $texture_count"
 ''

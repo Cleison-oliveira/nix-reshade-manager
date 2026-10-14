@@ -161,7 +161,7 @@ in {
     ];
 
     environment.sessionVariables = {
-      # Evita colisao caso exista camada legada no sistema
+      # Avoid collision if legacy layer exists on system
       VK_LOADER_LAYERS_DISABLE = "VK_LAYER_reshade_x86_64";
     };
   };

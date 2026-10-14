@@ -169,17 +169,17 @@ in {
     ];
 
     home.sessionVariables = {
-      # Evita colisao caso exista camada legada no sistema
+      # Avoid collision if legacy layer exists on system
       VK_LOADER_LAYERS_DISABLE = "VK_LAYER_reshade_x86_64";
     };
 
-    # Manifesto Vulkan para RESHADE=1 e RESHADE_ENABLE=1
+    # Vulkan manifests for RESHADE=1 and RESHADE_ENABLE=1
     xdg.dataFile."vulkan/implicit_layer.d/ReShade.json".source =
       "${cfg.package}/share/vulkan/implicit_layer.d/ReShade.json";
     xdg.dataFile."vulkan/implicit_layer.d/ReShade64.json".source =
       "${cfg.package}/share/vulkan/implicit_layer.d/ReShade64.json";
 
-    # Sincronizacao automatica da biblioteca de shaders na ativacao
+    # Automatic shader library synchronization on activation
     home.activation.setupReshadeShaders = mkIf cfg.autoSyncShaders (
       lib.hm.dag.entryAfter ["writeBoundary"] ''
         $DRY_RUN_CMD ${reshadeInstallShaders}/bin/reshade-install-shaders --sync

@@ -7,31 +7,31 @@ pkgs.writeShellScriptBin "reshade-preset" ''
 
   show_help() {
     cat << HELP
-reshade-preset - Informacoes e localizacao de perfis do ReShade
+reshade-preset - Inspect ReShade configuration paths and presets
 
-NOTA:
-  Todos os presets (.ini), temas visuais e atalhos de teclado sao gerenciados
-  diretamente dentro do jogo pela interface nativa do ReShade (Shift+F6).
+NOTE:
+  Presets (.ini), themes, and hotkeys can be edited directly inside
+  the running game via the ReShade menu (Shift + F6).
 
-USO:
-  reshade-preset list                Lista os perfis e presets existentes
-  reshade-preset dir [perfil]        Exibe o caminho das configuracoes
-  reshade-preset help                Exibe esta ajuda
+USAGE:
+  reshade-preset list                List existing profiles and presets
+  reshade-preset dir [profile]       Print path to profile configurations
+  reshade-preset help                Show this help message
 HELP
   }
 
   cmd="''${1:-list}"
   case "$cmd" in
     list)
-      echo "=== Perfis do ReShade em $CONFIGS_DIR ==="
+      echo "ReShade profiles in $CONFIGS_DIR:"
       if [ -d "$CONFIGS_DIR" ]; then
         for p in "$CONFIGS_DIR"/*; do
           [ -d "$p" ] || continue
           pname=$(basename "$p")
-          echo "  Perfil: $pname"
+          echo "  Profile: $pname"
           if [ -f "$p/ReShade.ini" ]; then
             preset=$(grep -E "^PresetPath=" "$p/ReShade.ini" 2>/dev/null | cut -d= -f2- || echo "ReShadePreset.ini")
-            echo "    Preset ativo: $preset"
+            echo "    Active preset: $preset"
           fi
           for f in "$p"/*.ini; do
             [ -e "$f" ] || continue

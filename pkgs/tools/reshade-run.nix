@@ -7,31 +7,30 @@ pkgs.writeShellScriptBin "reshade-run" ''
 
   show_help() {
     cat << "HELP"
-reshade-run - Inicializador nativo do ReShade para Linux Vulkan
+reshade-run - Native ReShade launcher for Linux Vulkan
 
-USO:
-  reshade-run [OPCOES] <comando> [argumentos...]
-  reshade-run %command%                  (Nas Opcoes de Inicializacao da Steam)
-  reshade-run flatpak run <app-id>       (Para jogos/emuladores Flatpak)
+USAGE:
+  reshade-run [OPTIONS] <command> [args...]
+  reshade-run %command%                  (Steam Launch Options)
+  reshade-run flatpak run <app-id>       (Flatpak games/emulators)
 
-VARIAVEIS DE AMBIENTE (alternativa para non-Steam games, Heronite, Heroic, Lutris):
-  RESHADE=1 <comando>                    Ativa o ReShade diretamente via variavel
-  RESHADE_ENABLE=1 <comando>             Sintaxe alternativa compativel
+ENVIRONMENT VARIABLES (alternative for non-Steam games, Heronite, Heroic, Lutris):
+  RESHADE=1 <command>                    Enable ReShade via environment variable
+  RESHADE_ENABLE=1 <command>             Alternative syntax
 
-OPCOES:
-  -p, --profile <NOME>  Define um perfil explicito do ReShade
-                        (Configuracoes em ~/.local/share/reshade/configurations/<NOME>)
-  -w, --wayland         Ativa PROTON_ENABLE_WAYLAND=1 (Wine Wayland nativo)
-  -n, --no-log          Ativa RESHADE_DISABLE_LOGGING=1 (desativa gravacao de logs)
-  -h, --help            Exibe esta ajuda
+OPTIONS:
+  -p, --profile <NAME>  Set an explicit ReShade profile
+                        (Configs in ~/.local/share/reshade/configurations/<NAME>)
+  -w, --wayland         Enable PROTON_ENABLE_WAYLAND=1 (Wine Wayland native)
+  -n, --no-log          Enable RESHADE_DISABLE_LOGGING=1 (disable log generation)
+  -h, --help            Show this help message
 
-CONFIGURACOES E INTERFACE:
-  - Atalhos padronizados (ou configurados declarativamente via Nix):
-      * Ativar / Desativar efeitos: Shift + F5
-      * Abrir / Fechar menu de configuracao: Shift + F6
-  - Todas as configuracoes (temas, estilos, atalhos de teclado, presets e shaders)
-    sao salvas e gerenciadas diretamente na interface nativa do ReShade.
-  - O ReShade mantem suas escolhas preservadas automaticamente no ReShade.ini.
+HOTKEYS & INTERFACE:
+  - Standard hotkeys (configurable declaratively via Nix):
+      * Toggle effects: Shift + F5
+      * Open/close ReShade menu: Shift + F6
+  - All settings (themes, hotkeys, presets, and shaders)
+    are saved directly in the in-game ReShade overlay.
 HELP
   }
 
@@ -55,7 +54,7 @@ HELP
         shift
         ;;
       -p|--profile)
-        [ -n "''${2:-}" ] || { echo "Erro: --profile requer um nome." >&2; exit 1; }
+        [ -n "''${2:-}" ] || { echo "Error: --profile requires a name." >&2; exit 1; }
         PROFILE="$2"
         shift 2
         ;;
@@ -73,14 +72,14 @@ HELP
     esac
   done
 
-  [ $# -gt 0 ] || { echo "Erro: Nenhum comando especificado." >&2; exit 1; }
+  [ $# -gt 0 ] || { echo "Error: No command specified." >&2; exit 1; }
 
   BASE_RESHADE_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/reshade"
   CONFIGS_DIR="$BASE_RESHADE_DIR/configurations"
   SHADERS_DIR="$BASE_RESHADE_DIR/reshade-shaders"
   mkdir -p "$CONFIGS_DIR"
 
-  # Define perfil explicito se solicitado
+  # Set explicit profile if requested
   if [ -n "$PROFILE" ]; then
     export RESHADE_PROFILE="$PROFILE"
   fi
@@ -92,7 +91,7 @@ HELP
   [ "$WAYLAND" -eq 1 ] && export PROTON_ENABLE_WAYLAND=1
   [ "$NO_LOG" -eq 1 ] && export RESHADE_DISABLE_LOGGING=1
 
-  # Execucao compativel com Flatpak
+  # Flatpak compatibility
   if [ "$(basename "$1")" = "flatpak" ]; then
     FLATPAK_ARGS=()
     FOUND_RUN=0
