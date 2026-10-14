@@ -90,19 +90,19 @@ Adicione o repositório aos `inputs` do seu `flake.nix`:
     # Desativa barra de tutorial na inicializacao
     disableWelcomeBar = true;
 
-    # Ativar ou desativar colecoes de shaders integradas
+    # Ativar ou desativar colecoes de shaders integradas (com creditos aos respectivos autores)
     builtinPacks = {
-      legacy = true;           # Crosire standard shaders
-      sweetfx = true;          # SweetFX shaders
-      quint = true;            # qUINT framework (martymcmodding)
-      prod80 = true;           # prod80 color grading
-      otisfx = true;           # OtisFX cinematic shaders
-      fubax = true;            # Fubax shaders
-      astrayfx = true;         # AstrayFX (Clarity.fx)
-      immerse = true;          # iMMERSE Marty's Mods (Sharpen, SMAA)
-      gshade = true;           # GShade & PPFX Bloom
-      reshadeTextures = true;  # Colecao de texturas e LUTs
-      barbatos = true;         # Barbatos (XeGTAO, SSR, DLAA-T, GI)
+      legacy = true;           # Crosire standard shaders (crosire)
+      sweetfx = true;          # SweetFX shaders (CeeJay.dk)
+      quint = true;            # qUINT framework (Marty McFly / Pascal Gilcher)
+      prod80 = true;           # prod80 color grading (prod80)
+      otisfx = true;           # OtisFX cinematic shaders (Frans Bouma / Otis_Inf)
+      fubax = true;            # Fubax shaders (Fubaxiusz)
+      astrayfx = true;         # AstrayFX Clarity.fx (BlueSkyDefender)
+      immerse = true;          # iMMERSE Marty's Mods (Marty McFly / Pascal Gilcher)
+      gshade = true;           # GShade & PPFX Bloom (Mortalitas)
+      reshadeTextures = true;  # Colecao de texturas e LUTs (Bhhl)
+      barbatos = true;         # Barbatos XeGTAO & SSR (BarbatosAWLS)
     };
 
     # Adicionar shader packs customizados declarativamente
@@ -210,6 +210,34 @@ reshade-install-shaders --force
 
 ---
 
+## 🙏 Créditos e Agradecimentos
+
+Este projeto reúne o trabalho extraordinário de desenvolvedores, pesquisadores de computação gráfica e artistas da comunidade open source. Nossos sinceros agradecimentos a todos os autores originais:
+
+### 🧩 Núcleo e Camada Vulkan no Linux
+
+- **ReShade**: Criado e mantido por **Patrick Mours ([crosire](https://github.com/crosire))** e comunidade ReShade ([site oficial](https://reshade.me), [repositório oficial](https://github.com/crosire/reshade)). O injetor pós-processador mais consolidado e versátil para renderização em tempo real.
+- **ReShade Linux Vulkan Layer**: Port nativo da camada Vulkan para Linux desenvolvido por **[TheForgotten69](https://github.com/TheForgotten69)** ([repositório](https://github.com/TheForgotten69/reshade)), tornando possível a injeção nativa sem necessidade de modificação nos executáveis dos jogos.
+- **nix-reshade**: Empacotamento inicial e inspiração arquitetural para Nix/NixOS por **[LovingMelody](https://github.com/LovingMelody)** ([repositório](https://github.com/LovingMelody/nix-reshade)).
+
+### 🎨 Autores dos Packs de Shaders e Texturas
+
+| Pack | Autor / Criador | Repositório Oficial | Descrição e Efeitos Notáveis |
+| :--- | :--- | :--- | :--- |
+| **Legacy** | **crosire** (Patrick Mours) & comunidade | [crosire/reshade-shaders](https://github.com/crosire/reshade-shaders) | Repositório oficial e padrão do ReShade. Inclui shaders essenciais de correção, anti-aliasing e utilidades (`FXAA`, `SMAA`, `Curves`, `Tonemap`, `Levels`, `Vibrance`, `LumaSharpen`, `Bloom`). |
+| **SweetFX** | **CeeJay.dk** (Christian Cann Schuldt Jensen) | [CeeJayDK/SweetFX](https://github.com/CeeJayDK/SweetFX) | A lendária suíte pioneira que inaugurou e popularizou o universo de pós-processamento em jogos de PC (`HDR`, `Bloom`, `Cineon DPX`, `Technicolor`, `Monochrome`, `Curves`). |
+| **qUINT** | **Marty McFly** (Pascal Gilcher) | [martymcmodding/qUINT](https://github.com/martymcmodding/qUINT) | Framework inovador baseado em física e precisão visual (`qUINT_lightroom` estilo Adobe Lightroom, `qUINT_mxao` ambient occlusion, `qUINT_dof`, `qUINT_sharp`, `qUINT_bloom`, `qUINT_ssr`). |
+| **prod80** | **prod80** | [prod80/prod80-ReShade-Repository](https://github.com/prod80/prod80-ReShade-Repository) | Suíte avançada de gradação de cores e balanço tonal (`Color Temperature`, `Color Balance`, `CMatrix`, `Film Grain`, `Shadows / Midtones / Highlights`, `Curves`). |
+| **OtisFX** | **Frans Bouma** (Otis_Inf) | [FransBouma/OtisFX](https://github.com/FransBouma/OtisFX) | Desenvolvido por especialista em fotografia virtual in-game e ferramentas de câmera (`CinematicDOF`, `AdaptiveFog`, `Emphasize`, `GoldenRatio`, `DepthAlpha`). |
+| **Fubax** | **Fubaxiusz** | [Fubaxiusz/fubax-shaders](https://github.com/Fubaxiusz/fubax-shaders) | Efeitos ópticos estilizados de câmera e lente (`Chromatic Aberration`, `PerfectPerspective`, `Prism`, `Fisheye`, `PaintFX`). |
+| **AstrayFX** | **BlueSkyDefender** | [BlueSkyDefender/AstrayFX](https://github.com/BlueSkyDefender/AstrayFX) | Shaders com percepção de profundidade de cena, famoso pelo aclamado `Clarity.fx` (aumento de contraste local e nitidez sem estourar cores) e `Depth_Refargo`. |
+| **iMMERSE** | **Marty McFly** (Pascal Gilcher) | [martymcmodding/iMMERSE](https://github.com/martymcmodding/iMMERSE) | Suíte contemporânea Marty's Mods com algoritmos de alto desempenho (`MartysMods_SHARPEN`, `MartysMods_SMAA`, `MartysMods_ReGrade`, `LAUNCHPAD`). |
+| **GShade & PPFX** | **Mortalitas**, Marot Satil & comunidade | [Mortalitas/GShade-Shaders](https://github.com/Mortalitas/GShade-Shaders) | Coleção consagrada na comunidade de RPGs e MMOs (como Final Fantasy XIV), destacando-se pelo icônico `PPFX_Bloom.fx` e SSAO personalizado. |
+| **Barbatos** | **BarbatosAWLS** | [BarbatosAWLS/Reshade-Shaders](https://github.com/BarbatosAWLS/Reshade-Shaders) | Shaders avançados em tempo real com raymarching e computação moderna (`XeGTAO` Intel Ground Truth Ambient Occlusion, `SSR`, `DLAA-T`, `GI` Global Illumination). |
+| **Texturas & LUTs** | **Bhhl** (curadoria) | [Bhhl/Reshade-NewFinalRender-textures](https://github.com/Bhhl/Reshade-NewFinalRender-textures) | Pacote consolidado de tabelas de ruído azul (blue noise), máscaras de lente, curvas e mapas LUT indispensáveis para o funcionamento correto dos shaders. |
+
+---
+
 ## 📜 Licença
 
-Distribuído sob licença BSD-3-Clause, compatível com o projeto ReShade upstream.
+Distribuído sob licença BSD-3-Clause, compatível com o projeto ReShade upstream. Cada pacote de shader mantém sua respectiva licença conforme especificado pelos seus autores em seus repositórios originais.

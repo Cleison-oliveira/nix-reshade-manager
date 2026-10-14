@@ -70,57 +70,57 @@ in {
       legacy = mkOption {
         type = types.bool;
         default = true;
-        description = "Standard ReShade shader repository (crosire/reshade-shaders).";
+        description = "Standard ReShade shader repository (by crosire / reshade-shaders).";
       };
       sweetfx = mkOption {
         type = types.bool;
         default = true;
-        description = "SweetFX shader suite (CeeJayDK/SweetFX).";
+        description = "SweetFX shader suite (by CeeJay.dk / CeeJayDK).";
       };
       quint = mkOption {
         type = types.bool;
         default = true;
-        description = "qUINT shader framework (martymcmodding/qUINT).";
+        description = "qUINT shader framework (by Pascal Gilcher / martymcmodding).";
       };
       prod80 = mkOption {
         type = types.bool;
         default = true;
-        description = "prod80 color correction and grading shaders.";
+        description = "Color correction and grading shaders (by prod80).";
       };
       otisfx = mkOption {
         type = types.bool;
         default = true;
-        description = "OtisFX cinematic shaders and camera tools (FransBouma/OtisFX).";
+        description = "OtisFX cinematic shaders and camera tools (by Frans Bouma / Otis_Inf).";
       };
       fubax = mkOption {
         type = types.bool;
         default = true;
-        description = "Fubax shaders and post-processing tools.";
+        description = "Fubax optical and styling shaders (by Fubaxiusz).";
       };
       astrayfx = mkOption {
         type = types.bool;
         default = true;
-        description = "AstrayFX clarity and sharpness shaders (Clarity.fx).";
+        description = "AstrayFX clarity and depth shaders (by BlueSkyDefender / Clarity.fx).";
       };
       immerse = mkOption {
         type = types.bool;
         default = true;
-        description = "iMMERSE Marty's Mods (MartysMods_SHARPEN, MartysMods_SMAA).";
+        description = "iMMERSE Marty's Mods (by Pascal Gilcher / MartysMods_SHARPEN, MartysMods_SMAA).";
       };
       gshade = mkOption {
         type = types.bool;
         default = true;
-        description = "GShade & PPFX Bloom collection (PPFX_Bloom.fx).";
+        description = "GShade & PPFX Bloom collection (by Mortalitas and community).";
       };
       reshadeTextures = mkOption {
         type = types.bool;
         default = true;
-        description = "Consolidated textures and LUTs collection.";
+        description = "Consolidated textures, blue noise and LUTs collection (curated by Bhhl).";
       };
       barbatos = mkOption {
         type = types.bool;
         default = true;
-        description = "Barbatos shaders (XeGTAO, SSR, DLAA-T, GI).";
+        description = "Barbatos shaders (XeGTAO, SSR, DLAA-T, GI by BarbatosAWLS).";
       };
     };
 

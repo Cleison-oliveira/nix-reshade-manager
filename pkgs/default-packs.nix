@@ -2,7 +2,7 @@
 pkgs: {
   legacy = {
     name = "legacy";
-    description = "Standard ReShade shader repository (crosire)";
+    description = "Standard ReShade shader repository by crosire";
     src = pkgs.fetchFromGitHub {
       owner = "crosire";
       repo = "reshade-shaders";
@@ -15,7 +15,7 @@ pkgs: {
 
   sweetfx = {
     name = "sweetfx";
-    description = "SweetFX shader suite (CeeJayDK)";
+    description = "SweetFX shader suite by CeeJay.dk (CeeJayDK)";
     src = pkgs.fetchFromGitHub {
       owner = "CeeJayDK";
       repo = "SweetFX";
@@ -28,7 +28,7 @@ pkgs: {
 
   quint = {
     name = "quint";
-    description = "qUINT shader framework (martymcmodding)";
+    description = "qUINT shader framework by Pascal Gilcher (Marty McFly / martymcmodding)";
     src = pkgs.fetchFromGitHub {
       owner = "martymcmodding";
       repo = "qUINT";
@@ -41,7 +41,7 @@ pkgs: {
 
   prod80 = {
     name = "prod80";
-    description = "prod80 color correction and grading shaders";
+    description = "Color correction and grading shaders by prod80";
     src = pkgs.fetchFromGitHub {
       owner = "prod80";
       repo = "prod80-ReShade-Repository";
@@ -56,7 +56,7 @@ pkgs: {
 
   otisfx = {
     name = "otisfx";
-    description = "OtisFX cinematic shaders and camera effects (FransBouma)";
+    description = "OtisFX cinematic shaders and camera tools by Frans Bouma (Otis_Inf)";
     src = pkgs.fetchFromGitHub {
       owner = "FransBouma";
       repo = "OtisFX";
@@ -71,7 +71,7 @@ pkgs: {
 
   fubax = {
     name = "fubax";
-    description = "Fubax shaders and post-processing tools";
+    description = "Fubax optical and styling shaders by Fubaxiusz";
     src = pkgs.fetchFromGitHub {
       owner = "Fubaxiusz";
       repo = "fubax-shaders";
@@ -86,7 +86,7 @@ pkgs: {
 
   astrayfx = {
     name = "astrayfx";
-    description = "AstrayFX clarity and sharpness effects (BlueSkyDefender)";
+    description = "AstrayFX clarity and depth shaders by BlueSkyDefender (Clarity.fx)";
     src = pkgs.fetchFromGitHub {
       owner = "BlueSkyDefender";
       repo = "AstrayFX";
@@ -101,7 +101,7 @@ pkgs: {
 
   immerse = {
     name = "immerse";
-    description = "iMMERSE Marty's Mods (martymcmodding)";
+    description = "iMMERSE Marty's Mods (Sharpen, SMAA) by Pascal Gilcher (martymcmodding)";
     src = pkgs.fetchFromGitHub {
       owner = "martymcmodding";
       repo = "iMMERSE";
@@ -116,7 +116,7 @@ pkgs: {
 
   gshade = {
     name = "gshade";
-    description = "GShade & PPFX Bloom collection (Mortalitas)";
+    description = "GShade & PPFX Bloom collection by Mortalitas and community";
     src = pkgs.fetchFromGitHub {
       owner = "Mortalitas";
       repo = "GShade-Shaders";
@@ -131,7 +131,7 @@ pkgs: {
 
   reshadeTextures = {
     name = "reshadeTextures";
-    description = "Consolidated textures and LUTs collection";
+    description = "Consolidated textures and LUTs collection curated by Bhhl";
     src = pkgs.fetchFromGitHub {
       owner = "Bhhl";
       repo = "Reshade-NewFinalRender-textures";
@@ -143,7 +143,7 @@ pkgs: {
 
   barbatos = {
     name = "barbatos";
-    description = "Barbatos shaders (XeGTAO, SSR, DLAA-T, GI)";
+    description = "Barbatos shaders (XeGTAO, SSR, DLAA-T, GI) by BarbatosAWLS";
     src = pkgs.fetchFromGitHub {
       owner = "BarbatosAWLS";
       repo = "Reshade-Shaders";
