@@ -1,19 +1,22 @@
 {
   lib,
   stdenv,
+  fetchurl,
   fetchFromGitHub,
-  reshade-linux-vulkan,
-  meson,
-  ninja,
-  pkg-config,
-  xorg,
-  vulkan-headers,
+  autoPatchelfHook,
+  python3,
+  wayland,
+  libxkbcommon,
+  libxcb,
+  libxcb-cursor,
+  fontconfig,
   vulkan-loader,
   builtinPacks ? {},
   extraPacks ? {},
   keyOverlay ? "117,0,1,0",
   keyEffects ? "116,0,1,0",
   disableWelcomeBar ? true,
+  version ? "6.8.0-beta.3",
 }: let
   defaultPacks = (import ./default-packs.nix {inherit fetchFromGitHub;});
 
@@ -36,149 +39,184 @@
     targetTexturesSubdir = pack.targetTexturesSubdir or "";
   in ''
     # Copy pack: ${name}
+    target_s="$out/share/reshade/reshade-shaders/Shaders/${targetShadersSubdir}"
+    target_t="$out/share/reshade/reshade-shaders/Textures/${targetTexturesSubdir}"
+    mkdir -p "$target_s" "$target_t"
+
     if [ -d "${src}/${shadersSubdir}" ]; then
-      mkdir -p "$out/share/reshade/reshade-shaders/Shaders/${targetShadersSubdir}"
-      cp -rn "${src}/${shadersSubdir}"/* "$out/share/reshade/reshade-shaders/Shaders/${targetShadersSubdir}/" 2>/dev/null || true
+      cp -rn "${src}/${shadersSubdir}/"* "$target_s/" 2>/dev/null || true
+    elif [ -d "${src}/shaders" ]; then
+      cp -rn "${src}/shaders/"* "$target_s/" 2>/dev/null || true
+    else
+      find "${src}" -maxdepth 2 \( -name "*.fx" -o -name "*.fxh" \) -exec cp -n {} "$target_s/" + 2>/dev/null || true
     fi
-    if [ -d "${src}/${texturesSubdir}" ]; then
-      mkdir -p "$out/share/reshade/reshade-shaders/Textures/${targetTexturesSubdir}"
-      cp -rn "${src}/${texturesSubdir}"/* "$out/share/reshade/reshade-shaders/Textures/${targetTexturesSubdir}/" 2>/dev/null || true
-    fi
-    # If src is flat with .fx files directly
-    if ls "${src}"/*.fx 1>/dev/null 2>&1; then
-      mkdir -p "$out/share/reshade/reshade-shaders/Shaders/${targetShadersSubdir}"
-      cp -rn "${src}"/*.fx "$out/share/reshade/reshade-shaders/Shaders/${targetShadersSubdir}/" 2>/dev/null || true
+
+    if [ -n "${texturesSubdir}" ] && [ -d "${src}/${texturesSubdir}" ]; then
+      cp -rn "${src}/${texturesSubdir}/"* "$target_t/" 2>/dev/null || true
+    elif [ -d "${src}/Textures" ]; then
+      cp -rn "${src}/Textures/"* "$target_t/" 2>/dev/null || true
+    elif [ -d "${src}/textures" ]; then
+      cp -rn "${src}/textures/"* "$target_t/" 2>/dev/null || true
+    elif [ -z "${texturesSubdir}" ] && [ -d "${src}" ]; then
+      cp -rn "${src}/"* "$target_t/" 2>/dev/null || true
     fi
   '';
 
   copyBuiltinPacks = lib.concatStringsSep "\n" (lib.mapAttrsToList copyPack activeBuiltinPacks);
   copyExtraPacks = lib.concatStringsSep "\n" (lib.mapAttrsToList copyPack extraPacks);
 in
-  stdenv.mkDerivation {
+  stdenv.mkDerivation rec {
     pname = "reshade-complete";
-    version = "6.8.0-beta.3";
+    inherit version;
 
-    srcs = [
-      reshade-linux-vulkan
-      ./loader_filter.c
+    src = fetchurl {
+      url = "https://github.com/TheForgotten69/reshade/releases/download/v${version}/reshade-linux-vulkan-v${version}-x86_64.tar.xz";
+      hash = "sha256-yICzjNRnvnOPDxH9JQjbdIwcE6lJNVQM+vzdCo79iUs=";
+    };
+
+    nativeBuildInputs = [
+      autoPatchelfHook
+      python3
     ];
 
-    sourceRoot = ".";
+    buildInputs = [
+      wayland
+      libxkbcommon
+      libxcb
+      libxcb-cursor
+      fontconfig
+      stdenv.cc.cc.lib
+      vulkan-loader
+    ];
 
-    nativeBuildInputs = [pkg-config];
-    buildInputs = [vulkan-headers];
-
-    buildPhase = ''
-      runHook preBuild
-      runHook postBuild
+    preFixup = ''
+      patchelf --add-rpath "$out/lib/reshade" $out/share/reshade/optional-addons/*.addon64 2>/dev/null || true
     '';
 
     installPhase = ''
       runHook preInstall
 
-      mkdir -p $out/lib
-      mkdir -p $out/share/vulkan/implicit_layer.d
-      mkdir -p $out/share/reshade/reshade-shaders/Shaders
-      mkdir -p $out/share/reshade/reshade-shaders/Textures
-      mkdir -p $out/share/reshade/optional-addons
+      mkdir -p $out/lib/reshade \
+               $out/share/vulkan/implicit_layer.d \
+               $out/share/reshade/optional-addons \
+               $out/share/reshade/reshade-shaders/Shaders \
+               $out/share/reshade/reshade-shaders/Textures
 
-      # Copy raw upstream libraries
-      cp -f ${reshade-linux-vulkan}/lib/libreShade.so $out/lib/libreShade_raw.so
-      cp -f ${reshade-linux-vulkan}/lib/libreShade.so $out/lib/libreShade.so
+      # Copy raw upstream library
+      cp lib/reshade/ReShade64.so $out/lib/reshade/ReShade64_orig.so
+      cp optional-addons/*.addon64 $out/share/reshade/optional-addons/ 2>/dev/null || true
 
       ${lib.optionalString disableWelcomeBar ''
         # Binary patch to suppress initial tutorial welcome banner
-        sed -i 's/\x00Tutorial\x00/\x00Tutorial_Off\x00/g' $out/lib/libreShade_raw.so 2>/dev/null || true
-        sed -i 's/\x00Tutorial\x00/\x00Tutorial_Off\x00/g' $out/lib/libreShade.so 2>/dev/null || true
+        python3 -c '
+with open("'"$out/lib/reshade/ReShade64_orig.so"'", "rb") as f:
+    data = bytearray(f.read())
+pattern = b"\xc6\x83\x50\x05\x00\x00\x01"
+idx = data.find(pattern)
+if idx != -1:
+    data[idx + 6] = 0x00
+with open("'"$out/lib/reshade/ReShade64_orig.so"'", "wb") as f:
+    f.write(data)
+'
       ''}
 
-      # Compile transparent loader filter
-      $CC -O3 -fPIC -shared -Wall \
+      # Prepare loader filter with replaced path
+      cp ${./loader_filter.c} ./loader_filter_src.c
+      substituteInPlace ./loader_filter_src.c \
+        --replace-fail "@ORIG_RESHADE_SO@" "$out/lib/reshade/ReShade64_orig.so"
+
+      # Compile transparent loader filter with configured hotkeys
+      $CC -shared -fPIC -O3 \
         -DDEFAULT_KEY_OVERLAY="\"${keyOverlay}\"" \
         -DDEFAULT_KEY_EFFECTS="\"${keyEffects}\"" \
-        ${./loader_filter.c} \
-        -o $out/lib/libReShade_loader_filter.so \
+        ./loader_filter_src.c \
+        -o $out/lib/reshade/ReShade64.so \
         -ldl
 
-      # Copy default official shaders
-      cp -r ${reshade-linux-vulkan}/share/reshade/reshade-shaders/Shaders/* $out/share/reshade/reshade-shaders/Shaders/ || true
-      cp -r ${reshade-linux-vulkan}/share/reshade/reshade-shaders/Textures/* $out/share/reshade/reshade-shaders/Textures/ || true
+      # Symlink compatibility paths
+      mkdir -p $out/lib
+      ln -sf reshade/ReShade64.so $out/lib/libReShade_loader_filter.so
+      ln -sf reshade/ReShade64.so $out/lib/ReShade64.so
+      ln -sf reshade/ReShade64_orig.so $out/lib/ReShade64_orig.so
 
-      # Copy enabled built-in packs
+      # Official default shaders from upstream package
+      cp -r share/reshade/reshade-shaders/Shaders/* $out/share/reshade/reshade-shaders/Shaders/ 2>/dev/null || true
+      cp -r share/reshade/reshade-shaders/Textures/* $out/share/reshade/reshade-shaders/Textures/ 2>/dev/null || true
+
+      # Copy declaratively enabled built-in packs
       ${copyBuiltinPacks}
 
-      # Copy custom extra packs
+      # Copy declaratively configured extra packs
       ${copyExtraPacks}
 
-      # Copy optional addons if available
-      cp -rf ${reshade-linux-vulkan}/share/reshade/*.addon64 $out/share/reshade/optional-addons/ 2>/dev/null || true
+      chmod -R u+w "$out/share/reshade/reshade-shaders"
 
-      # Normalize backslash include directives
+      # Normalize backslash include directives (Windows paths)
       find "$out/share/reshade/reshade-shaders/Shaders" -type f \( -name "*.fx" -o -name "*.fxh" \) \
         -exec sed -i '/^[[:space:]]*#include/ s|\\|/|g' {} + 2>/dev/null || true
 
-      # Compatibility symlinks for case-sensitive includes
-      for f in "$out/share/reshade/reshade-shaders/Shaders"/*; do
-        if [ -d "$f" ]; then
-          b=$(basename "$f")
-          lb=$(echo "$b" | tr '[:upper:]' '[:lower:]')
-          if [ "$b" != "$lb" ] && [ ! -e "$out/share/reshade/reshade-shaders/Shaders/$lb" ]; then
-            ln -sf "$b" "$out/share/reshade/reshade-shaders/Shaders/$lb"
-          fi
-        fi
+      # Case-insensitive compatibility symlinks
+      for sdir in "$out/share/reshade/reshade-shaders/Shaders"; do
+        [ -f "$sdir/ReShade.fxh" ] && ln -sf ReShade.fxh "$sdir/Reshade.fxh" && ln -sf ReShade.fxh "$sdir/reshade.fxh" || true
+        [ -f "$sdir/ReShadeUI.fxh" ] && ln -sf ReShadeUI.fxh "$sdir/ReshadeUI.fxh" && ln -sf ReShadeUI.fxh "$sdir/reshadeui.fxh" || true
       done
+      find "$out/share/reshade" -name "*.fx" -exec sed -i 's/"Reshade\.fxh"/"ReShade\.fxh"/g' {} + 2>/dev/null || true
 
       # Main Vulkan manifest for RESHADE=1
-      cat << 'JSON' > $out/share/vulkan/implicit_layer.d/ReShade.json
-      {
-        "file_format_version": "1.0.0",
-        "layer": {
-          "name": "VK_LAYER_RESHADE_overlay_x86_64",
-          "type": "GLOBAL",
-          "library_path": "OUT_DIR/lib/libReShade_loader_filter.so",
-          "api_version": "1.3.0",
-          "implementation_version": "1",
-          "description": "ReShade overlay layer with intelligent process filter",
-          "functions": {
-            "vkNegotiateLoaderLayerInterfaceVersion": "vkNegotiateLoaderLayerInterfaceVersion",
-            "vkGetInstanceProcAddr": "vkGetInstanceProcAddr"
-          },
-          "enable_environment": {
-            "RESHADE": "1"
-          },
-          "disable_environment": {
-            "DISABLE_RESHADE": "1"
-          }
-        }
+      cat << 'MANIFEST_EOF' > $out/share/vulkan/implicit_layer.d/ReShade.json
+{
+    "file_format_version" : "1.0.0",
+    "layer" : {
+      "name": "VK_LAYER_RESHADE_overlay_x86_64",
+      "type": "GLOBAL",
+      "api_version": "1.3.0",
+      "library_path": "$out/lib/reshade/ReShade64.so",
+      "implementation_version": "1",
+      "description": "ReShade overlay layer with intelligent process filter",
+      "functions": {
+         "vkNegotiateLoaderLayerInterfaceVersion": "vkNegotiateLoaderLayerInterfaceVersion",
+         "vkGetInstanceProcAddr": "vkGetInstanceProcAddr"
+      },
+      "enable_environment": {
+        "RESHADE": "1"
+      },
+      "disable_environment": {
+        "DISABLE_RESHADE": "1"
       }
-      JSON
-      sed -i "s|OUT_DIR|$out|g" $out/share/vulkan/implicit_layer.d/ReShade.json
+    }
+}
+MANIFEST_EOF
+
+      substituteInPlace $out/share/vulkan/implicit_layer.d/ReShade.json \
+        --replace-fail '$out' "$out"
 
       # Backward compatibility Vulkan manifest for RESHADE_ENABLE=1
-      cat << 'JSON' > $out/share/vulkan/implicit_layer.d/ReShade64.json
-      {
-        "file_format_version": "1.0.0",
-        "layer": {
-          "name": "VK_LAYER_RESHADE_overlay_x86_64",
-          "type": "GLOBAL",
-          "library_path": "OUT_DIR/lib/libReShade_loader_filter.so",
-          "api_version": "1.3.0",
-          "implementation_version": "1",
-          "description": "ReShade overlay layer with intelligent process filter",
-          "functions": {
-            "vkNegotiateLoaderLayerInterfaceVersion": "vkNegotiateLoaderLayerInterfaceVersion",
-            "vkGetInstanceProcAddr": "vkGetInstanceProcAddr"
-          },
-          "enable_environment": {
-            "RESHADE_ENABLE": "1"
-          },
-          "disable_environment": {
-            "DISABLE_RESHADE": "1"
-          }
-        }
+      cat << 'MANIFEST_EOF' > $out/share/vulkan/implicit_layer.d/ReShade64.json
+{
+    "file_format_version" : "1.0.0",
+    "layer" : {
+      "name": "VK_LAYER_RESHADE_legacy_x86_64",
+      "type": "GLOBAL",
+      "api_version": "1.3.0",
+      "library_path": "$out/lib/reshade/ReShade64.so",
+      "implementation_version": "1",
+      "description": "ReShade overlay layer with intelligent process filter (legacy RESHADE_ENABLE)",
+      "functions": {
+         "vkNegotiateLoaderLayerInterfaceVersion": "vkNegotiateLoaderLayerInterfaceVersion",
+         "vkGetInstanceProcAddr": "vkGetInstanceProcAddr"
+      },
+      "enable_environment": {
+        "RESHADE_ENABLE": "1"
+      },
+      "disable_environment": {
+        "DISABLE_RESHADE": "1"
       }
-      JSON
-      sed -i "s|OUT_DIR|$out|g" $out/share/vulkan/implicit_layer.d/ReShade64.json
+    }
+}
+MANIFEST_EOF
+
+      substituteInPlace $out/share/vulkan/implicit_layer.d/ReShade64.json \
+        --replace-fail '$out' "$out"
 
       runHook postInstall
     '';
