@@ -101,34 +101,288 @@ static int is_reshade_disabled(void) {
     return 0;
 }
 
-static int is_launcher_or_helper(void) {
-    char exe_path[1024];
-    ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-    if (n > 0) {
-        exe_path[n] = '\0';
-        const char *base = get_basename(exe_path);
-        char lower_exe[256];
-        size_t elen = strlen(base);
-        if (elen >= sizeof(lower_exe)) elen = sizeof(lower_exe) - 1;
-        for (size_t i = 0; i < elen; i++) {
-            lower_exe[i] = (char)tolower((unsigned char)base[i]);
-        }
-        lower_exe[elen] = '\0';
+static void get_wine_guest_exe(char *out_guest, size_t out_len) {
+    if (!out_guest || out_len == 0) return;
+    out_guest[0] = '\0';
 
-        if (strcmp(lower_exe, "heroic") == 0 ||
-            strcmp(lower_exe, "lutris") == 0 ||
-            strcmp(lower_exe, "heronite") == 0 ||
-            strcmp(lower_exe, "steam") == 0 ||
-            strcmp(lower_exe, "steamwebhelper") == 0 ||
-            strcmp(lower_exe, "epicwebhelper") == 0 ||
-            strcmp(lower_exe, "gamescope") == 0 ||
-            strcmp(lower_exe, "gamemoded") == 0 ||
-            strcmp(lower_exe, "faugus") == 0) {
-            return 1;
+    FILE *f = fopen("/proc/self/cmdline", "rb");
+    if (!f) return;
+
+    char cmd[4096] = {0};
+    size_t rd = fread(cmd, 1, sizeof(cmd) - 1, f);
+    fclose(f);
+    if (rd == 0) return;
+
+    size_t pos = 0;
+    while (pos < rd) {
+        const char *arg = cmd + pos;
+        size_t arg_len = strlen(arg);
+        if (arg_len >= 4) {
+            char lower_arg[512] = {0};
+            size_t cplen = arg_len < sizeof(lower_arg) - 1 ? arg_len : sizeof(lower_arg) - 1;
+            for (size_t i = 0; i < cplen; i++) {
+                lower_arg[i] = (char)tolower((unsigned char)arg[i]);
+            }
+            char *exe_pos = strstr(lower_arg, ".exe");
+            if (exe_pos != NULL) {
+                size_t exe_end = (size_t)(exe_pos - lower_arg) + 4;
+                char temp[512] = {0};
+                if (exe_end >= sizeof(temp)) exe_end = sizeof(temp) - 1;
+                memcpy(temp, arg, exe_end);
+                temp[exe_end] = '\0';
+                const char *base = get_basename(temp);
+                if (strcasecmp(base, "wine.exe") != 0 &&
+                    strcasecmp(base, "wine64.exe") != 0 &&
+                    strcasecmp(base, "wineserver.exe") != 0) {
+                    snprintf(out_guest, out_len, "%s", base);
+                    return;
+                }
+            }
+        }
+        pos += arg_len + 1;
+    }
+}
+
+static int is_launcher_or_helper(void) {
+    char exe_path[1024] = {0};
+    ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (n <= 0) return 0;
+    exe_path[n] = '\0';
+
+    const char *base = get_basename(exe_path);
+    char lower_exe[256] = {0};
+    size_t elen = strlen(base);
+    if (elen >= sizeof(lower_exe)) elen = sizeof(lower_exe) - 1;
+    for (size_t i = 0; i < elen; i++) {
+        lower_exe[i] = (char)tolower((unsigned char)base[i]);
+    }
+    lower_exe[elen] = '\0';
+
+    // 1. Native Linux launchers and wrappers
+    if (strcmp(lower_exe, "heroic") == 0 ||
+        strcmp(lower_exe, "lutris") == 0 ||
+        strcmp(lower_exe, "heronite") == 0 ||
+        strcmp(lower_exe, "steam") == 0 ||
+        strcmp(lower_exe, "steamwebhelper") == 0 ||
+        strcmp(lower_exe, "epicwebhelper") == 0 ||
+        strcmp(lower_exe, "gamescope") == 0 ||
+        strcmp(lower_exe, "gamemoded") == 0 ||
+        strcmp(lower_exe, "faugus") == 0 ||
+        strcmp(lower_exe, "bottles") == 0 ||
+        strcmp(lower_exe, "umu-run") == 0) {
+        return 1;
+    }
+
+    // 2. Wine / Proton process checks
+    if (strstr(lower_exe, "wine") != NULL) {
+        char guest_exe[256] = {0};
+        get_wine_guest_exe(guest_exe, sizeof(guest_exe));
+        if (guest_exe[0] != '\0') {
+            char lower_guest[256] = {0};
+            size_t glen = strlen(guest_exe);
+            if (glen >= sizeof(lower_guest)) glen = sizeof(lower_guest) - 1;
+            for (size_t i = 0; i < glen; i++) {
+                lower_guest[i] = (char)tolower((unsigned char)guest_exe[i]);
+            }
+            lower_guest[glen] = '\0';
+
+            // Windows / Wine system background processes
+            if (strcmp(lower_guest, "explorer.exe") == 0 ||
+                strcmp(lower_guest, "xalia.exe") == 0 ||
+                strcmp(lower_guest, "services.exe") == 0 ||
+                strcmp(lower_guest, "svchost.exe") == 0 ||
+                strcmp(lower_guest, "winedevice.exe") == 0 ||
+                strcmp(lower_guest, "plugplay.exe") == 0 ||
+                strcmp(lower_guest, "conhost.exe") == 0 ||
+                strcmp(lower_guest, "cmd.exe") == 0 ||
+                strcmp(lower_guest, "rundll32.exe") == 0 ||
+                strcmp(lower_guest, "dxsetup.exe") == 0 ||
+                strcmp(lower_guest, "start.exe") == 0 ||
+                strcmp(lower_guest, "rpcss.exe") == 0 ||
+                strcmp(lower_guest, "wineboot.exe") == 0) {
+                return 1;
+            }
+
+            // Diagnostic, crash reporter, web helper and anti-cheat stubs
+            if (strstr(lower_guest, "crashreport") != NULL ||
+                strstr(lower_guest, "crashhandler") != NULL ||
+                strstr(lower_guest, "bugreport") != NULL ||
+                strstr(lower_guest, "socialclub") != NULL ||
+                strstr(lower_guest, "cefsubprocess") != NULL ||
+                strstr(lower_guest, "webhelper") != NULL ||
+                strstr(lower_guest, "easyanticheat") != NULL ||
+                strstr(lower_guest, "start_protected_game") != NULL ||
+                strstr(lower_guest, "beservice") != NULL) {
+                return 1;
+            }
+
+            // Game launchers and wrappers (unless explicitly allowed via RESHADE_ALLOW_LAUNCHER=1)
+            const char *allow_launcher = getenv("RESHADE_ALLOW_LAUNCHER");
+            if (!allow_launcher || allow_launcher[0] == '\0' || strcmp(allow_launcher, "0") == 0) {
+                if (strstr(lower_guest, "launcher") != NULL ||
+                    strstr(lower_guest, "updater") != NULL ||
+                    strstr(lower_guest, "patcher") != NULL ||
+                    strcmp(lower_guest, "dowser.exe") == 0 ||
+                    strcmp(lower_guest, "upc.exe") == 0 ||
+                    strcmp(lower_guest, "battle.net.exe") == 0 ||
+                    strcmp(lower_guest, "eadesktop.exe") == 0 ||
+                    strcmp(lower_guest, "origin.exe") == 0 ||
+                    strcmp(lower_guest, "galaxyclient.exe") == 0 ||
+                    strcmp(lower_guest, "epicgameslauncher.exe") == 0) {
+                    return 1;
+                }
+            }
         }
     }
 
     return 0;
+}
+
+static void sanitize_name(char *dst, const char *src, size_t max_len) {
+    if (!dst || max_len == 0) return;
+    dst[0] = '\0';
+    if (!src || src[0] == '\0') {
+        snprintf(dst, max_len, "application");
+        return;
+    }
+
+    size_t out_idx = 0;
+    int last_was_underscore = 0;
+
+    for (size_t i = 0; src[i] != '\0' && out_idx + 1 < max_len; i++) {
+        unsigned char c = (unsigned char)src[i];
+        if (c < 0x80 && !isalnum(c) && c != '-' && c != '_') {
+            c = '_';
+        }
+        if (c == '_') {
+            if (out_idx == 0 || last_was_underscore) {
+                continue;
+            }
+            last_was_underscore = 1;
+        } else {
+            last_was_underscore = 0;
+        }
+        dst[out_idx++] = (char)c;
+    }
+
+    while (out_idx > 0 && dst[out_idx - 1] == '_') {
+        out_idx--;
+    }
+    dst[out_idx] = '\0';
+
+    if (dst[0] == '\0') {
+        snprintf(dst, max_len, "application");
+    }
+}
+
+static const char *get_path_label(const char *path, char *buf, size_t buf_len) {
+    if (!path || path[0] == '\0' || !buf || buf_len == 0) return "";
+    buf[0] = '\0';
+    char tmp[1024];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    size_t len = strlen(tmp);
+    while (len > 1 && (tmp[len - 1] == '/' || tmp[len - 1] == '\\')) {
+        tmp[--len] = '\0';
+    }
+    const char *base = get_basename(tmp);
+    if (strcmp(base, "pfx") == 0 || strcmp(base, "prefix") == 0) {
+        char *p = strrchr(tmp, '/');
+        if (!p) p = strrchr(tmp, '\\');
+        if (p) {
+            *p = '\0';
+            base = get_basename(tmp);
+        }
+    }
+    snprintf(buf, buf_len, "%s", base);
+    return buf;
+}
+
+static void resolve_profile_name(char *out_profile, size_t max_len) {
+    if (!out_profile || max_len == 0) return;
+    out_profile[0] = '\0';
+
+    const char *env_prof = getenv("RESHADE_PROFILE");
+    if (env_prof && env_prof[0] != '\0') {
+        sanitize_name(out_profile, env_prof, max_len);
+        return;
+    }
+
+    char exe_path[1024] = {0};
+    ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+    if (n > 0) exe_path[n] = '\0';
+    const char *linux_base = get_basename(exe_path);
+
+    char lower_linux[256] = {0};
+    size_t elen = strlen(linux_base);
+    if (elen >= sizeof(lower_linux)) elen = sizeof(lower_linux) - 1;
+    for (size_t i = 0; i < elen; i++) lower_linux[i] = (char)tolower((unsigned char)linux_base[i]);
+
+    int is_wine = (strstr(lower_linux, "wine") != NULL);
+
+    const char *steam_compat = getenv("STEAM_COMPAT_INSTALL_PATH");
+    const char *steam_app_id = getenv("SteamAppId");
+    const char *wine_prefix = getenv("WINEPREFIX");
+
+    char raw_label[512] = {0};
+
+    if (is_wine) {
+        char pfx_label[256] = {0};
+        if (steam_compat && steam_compat[0] != '\0') {
+            get_path_label(steam_compat, raw_label, sizeof(raw_label));
+        }
+        if (raw_label[0] == '\0') {
+            char guest_exe[256] = {0};
+            get_wine_guest_exe(guest_exe, sizeof(guest_exe));
+            if (guest_exe[0] != '\0') {
+                char *dot = strrchr(guest_exe, '.');
+                if (dot) *dot = '\0';
+                snprintf(raw_label, sizeof(raw_label), "%s", guest_exe);
+            }
+        }
+        if (raw_label[0] == '\0') {
+            snprintf(raw_label, sizeof(raw_label), "%s", linux_base);
+        }
+
+        char sanitized_label[256];
+        sanitize_name(sanitized_label, raw_label, sizeof(sanitized_label));
+
+        if (steam_app_id && steam_app_id[0] != '\0') {
+            char sanitized_suffix[128];
+            sanitize_name(sanitized_suffix, steam_app_id, sizeof(sanitized_suffix));
+            snprintf(out_profile, max_len, "%s-%s", sanitized_label, sanitized_suffix);
+        } else if (wine_prefix && wine_prefix[0] != '\0') {
+            get_path_label(wine_prefix, pfx_label, sizeof(pfx_label));
+            if (strcmp(pfx_label, ".wine") != 0 && pfx_label[0] != '\0') {
+                char sanitized_suffix[128];
+                sanitize_name(sanitized_suffix, pfx_label, sizeof(sanitized_suffix));
+                snprintf(out_profile, max_len, "%s-%s", sanitized_label, sanitized_suffix);
+            } else {
+                snprintf(out_profile, max_len, "%s", sanitized_label);
+            }
+        } else {
+            snprintf(out_profile, max_len, "%s", sanitized_label);
+        }
+        return;
+    }
+
+    if (steam_app_id && steam_app_id[0] != '\0' && steam_compat && steam_compat[0] != '\0') {
+        char base_label[256], sanitized_base[256], sanitized_suffix[128];
+        get_path_label(steam_compat, base_label, sizeof(base_label));
+        sanitize_name(sanitized_base, base_label, sizeof(sanitized_base));
+        sanitize_name(sanitized_suffix, steam_app_id, sizeof(sanitized_suffix));
+        snprintf(out_profile, max_len, "%s-%s", sanitized_base, sanitized_suffix);
+        return;
+    }
+
+    char sanitized_base[256];
+    sanitize_name(sanitized_base, linux_base, sizeof(sanitized_base));
+    if (steam_app_id && steam_app_id[0] != '\0') {
+        char sanitized_suffix[128];
+        sanitize_name(sanitized_suffix, steam_app_id, sizeof(sanitized_suffix));
+        snprintf(out_profile, max_len, "%s-%s", sanitized_base, sanitized_suffix);
+    } else {
+        snprintf(out_profile, max_len, "%s", sanitized_base);
+    }
 }
 
 static void ensure_directories_and_preset(const char *profile_dir) {
@@ -239,7 +493,7 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         return;
     }
 
-    // File exists: inspect without touching user settings
+    // File exists: inspect without touching custom user settings
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -268,6 +522,10 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         ps += 11;
     }
 
+    int has_input_section = (strstr(content, "[INPUT]") != NULL);
+    int has_fallback_key_overlay = (strstr(content, "KeyOverlay=36,0,0,0") != NULL && strcmp(DEFAULT_KEY_OVERLAY, "36,0,0,0") != 0);
+    int has_zero_key_effects = (strstr(content, "KeyEffects=0,0,0,0") != NULL && strcmp(DEFAULT_KEY_EFFECTS, "0,0,0,0") != 0);
+
     int needs_fix = 0;
     if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL || has_old_nix_store) {
         needs_fix = 1;
@@ -276,6 +534,9 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         needs_fix = 1;
     }
     if (!has_valid_docking || has_about_selected || !has_valid_window) {
+        needs_fix = 1;
+    }
+    if (!has_input_section || has_fallback_key_overlay || has_zero_key_effects) {
         needs_fix = 1;
     }
 
@@ -298,16 +559,26 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     char *saveptr = NULL;
     char *line = strtok_r(content, "\r\n", &saveptr);
     int in_general = 0;
+    int in_input = 0;
 
     while (line) {
         if (strcmp(line, "[GENERAL]") == 0) {
             in_general = 1;
+            in_input = 0;
+            fprintf(out, "%s\n", line);
+            line = strtok_r(NULL, "\r\n", &saveptr);
+            continue;
+        }
+        if (strcmp(line, "[INPUT]") == 0) {
+            in_input = 1;
+            in_general = 0;
             fprintf(out, "%s\n", line);
             line = strtok_r(NULL, "\r\n", &saveptr);
             continue;
         }
         if (strcmp(line, "[OVERLAY]") == 0) {
             in_general = 0;
+            in_input = 0;
             fprintf(out, "%s\n", line);
             if (!has_docking_line) {
                 fputs(DEFAULT_OVERLAY_DOCKING, out);
@@ -323,6 +594,7 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         }
         if (line[0] == '[') {
             in_general = 0;
+            in_input = 0;
         }
 
         if (in_general) {
@@ -342,6 +614,19 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
             }
             if (strncmp(line, "PresetPath=./ReShadePreset.ini", 30) == 0) {
                 fprintf(out, "PresetPath=%s\n", preset_path);
+                line = strtok_r(NULL, "\r\n", &saveptr);
+                continue;
+            }
+        }
+
+        if (in_input) {
+            if (has_fallback_key_overlay && strncmp(line, "KeyOverlay=36,0,0,0", 19) == 0) {
+                fprintf(out, "KeyOverlay=%s\n", DEFAULT_KEY_OVERLAY);
+                line = strtok_r(NULL, "\r\n", &saveptr);
+                continue;
+            }
+            if (has_zero_key_effects && strncmp(line, "KeyEffects=0,0,0,0", 18) == 0) {
+                fprintf(out, "KeyEffects=%s\n", DEFAULT_KEY_EFFECTS);
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
@@ -378,6 +663,14 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
 
         fprintf(out, "%s\n", line);
         line = strtok_r(NULL, "\r\n", &saveptr);
+    }
+
+    if (!has_input_section) {
+        fprintf(out,
+            "\n[INPUT]\n"
+            "KeyEffects=" DEFAULT_KEY_EFFECTS "\n"
+            "KeyOverlay=" DEFAULT_KEY_OVERLAY "\n"
+        );
     }
 
     if (!has_overlay_section) {
@@ -483,26 +776,27 @@ int vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLoaderLayerInterfaceVersio
     }
 
     if (is_reshade_disabled() || is_launcher_or_helper()) {
-        log_debug("[ReShade Filter] PID %d (%s | %s): Ignored (disabled or desktop launcher)\n", getpid(), exe, cmd);
+        log_debug("[ReShade Filter] PID %d (%s | %s): Ignored (disabled, launcher or helper process)\n", getpid(), exe, cmd);
         return -3;
     }
 
     log_debug("[ReShade Filter] PID %d (%s | %s): Negotiating interface version %u...\n",
               getpid(), exe, cmd, pVersionStruct ? pVersionStruct->loaderLayerInterfaceVersion : 0);
 
-    // Pre-initialize and standardize profile for the current process
-    const char *app_name = get_basename(exe);
-    if (app_name && *app_name) {
+    // Pre-initialize and standardize profile for the resolved game profile
+    char profile_name[256] = {0};
+    resolve_profile_name(profile_name, sizeof(profile_name));
+    if (profile_name[0] != '\0') {
         const char *xdg = getenv("XDG_DATA_HOME");
         char pdir[1024], ini[1024];
         if (xdg && xdg[0] != '\0') {
-            snprintf(pdir, sizeof(pdir), "%s/reshade/configurations/%s", xdg, app_name);
+            snprintf(pdir, sizeof(pdir), "%s/reshade/configurations/%s", xdg, profile_name);
             snprintf(ini, sizeof(ini), "%s/ReShade.ini", pdir);
             setup_profile_ini(ini, pdir);
         }
         const char *home = getenv("HOME");
         if (home && home[0] != '\0') {
-            snprintf(pdir, sizeof(pdir), "%s/.local/share/reshade/configurations/%s", home, app_name);
+            snprintf(pdir, sizeof(pdir), "%s/.local/share/reshade/configurations/%s", home, profile_name);
             snprintf(ini, sizeof(ini), "%s/ReShade.ini", pdir);
             setup_profile_ini(ini, pdir);
         }
