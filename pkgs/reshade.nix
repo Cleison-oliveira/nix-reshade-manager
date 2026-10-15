@@ -20,13 +20,13 @@
 }: let
   defaultPacks = (import ./default-packs.nix {inherit fetchFromGitHub;});
 
-  # Filter active built-in packs based on user preferences (default to true)
+  # Filter active built-in packs based on user preferences (default to false)
   activeBuiltinPacks =
     lib.filterAttrs (
       name: pack:
         if builtinPacks ? ${name}
         then builtinPacks.${name}
-        else true
+        else false
     )
     defaultPacks;
 

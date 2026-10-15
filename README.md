@@ -13,12 +13,12 @@ Compatible with native Linux games, Steam (Proton), Heronite, Heroic Games Launc
   - Prevents injection into desktop launchers (Heroic, Lutris, Heronite, Steam).
   - Ignores Wine/Proton background daemons (`explorer.exe`, `services.exe`, `winedevice.exe`).
   - Supports 64-bit and 32-bit Windows games through Wine New WoW64 (`PROTON_USE_WOW64=1`).
-- Fully Declarative Shader Packs:
-  - Shaders are packaged into the Nix store and provided directly to ReShade without requiring any installation scripts.
-  - Curated built-in packs enabled or disabled individually (crosire, SweetFX, qUINT, prod80, OtisFX, Fubax, AstrayFX, iMMERSE, GShade, Barbatos, Textures).
-  - Support for custom declarative packs via `extraPacks`.
+- Manual and Modular Shader Pack Management:
+  - By default, no extra shader packs are bundled, keeping builds fast and lightweight.
+  - Users explicitly choose which curated packs to enable via `builtinPacks`.
+  - Full support for arbitrary custom shader repositories via `extraPacks`.
 - In-Game UI Modifiable & Persistent Configurations:
-  - Default hotkeys and initial search paths are configured declaratively in Nix.
+  - Default hotkeys and search paths are configured declaratively in Nix.
   - Any modifications made in-game via the ReShade UI (custom hotkeys, overlay styling, parameters, presets) are saved and preserved permanently in writable user storage (`~/.local/share/reshade/configurations/<game>/`).
 - Welcome Tutorial Suppression:
   - Optional binary patch (`disableWelcomeBar = true`) that permanently suppresses the startup welcome banner.
@@ -70,9 +70,73 @@ Add this repository to your `flake.nix` inputs:
 
 ---
 
-## Configuration
+## Tutorial: Configuring Shader Packs Manually
 
-### 1. NixOS Module (`configuration.nix`)
+Shader packs are **opt-in** by default. ReShade only includes its essential core files (`ReShade.fxh`, `DisplayDepth`, `LUT.fx`, etc.) unless you explicitly enable curated packs or declare custom repositories.
+
+### 1. Enabling Curated Built-in Packs
+
+To enable any of the built-in shader packs, set their respective attributes to `true` in `programs.reshade.builtinPacks`:
+
+```nix
+programs.reshade = {
+  enable = true;
+
+  builtinPacks = {
+    legacy = true;           # Official ReShade repository (FXAA, SMAA, Curves, Tonemap)
+    sweetfx = true;          # SweetFX suite (HDR, Bloom, Cartoon, Cineon DPX)
+    quint = true;            # qUINT framework (Lightroom, MXAO, DOF, Sharp, Bloom)
+    prod80 = true;           # Color grading suite (Color Temperature, CMatrix, Shadows/Highlights)
+    otisfx = true;           # Cinematic photography (CinematicDOF, AdaptiveFog, GoldenRatio)
+    fubax = true;            # Optical effects (Chromatic Aberration, PerfectPerspective, Fisheye)
+    astrayfx = true;         # Clarity.fx and depth enhancement
+    immerse = true;          # iMMERSE Marty's Mods (Sharpen, SMAA, ReGrade)
+    gshade = true;           # GShade & PPFX Bloom
+    reshadeTextures = true;  # Consolidated textures, noise tables, and LUTs
+    barbatos = true;         # Advanced raymarching (XeGTAO, SSR, DLAA-T, GI)
+  };
+};
+```
+
+### 2. Adding Custom Shader Packs (`extraPacks`)
+
+You can declare any external Git repository or local directory using `extraPacks`. Nix will download the repository at build time and bundle its shaders into ReShade:
+
+```nix
+programs.reshade = {
+  enable = true;
+
+  extraPacks = {
+    # Simple GitHub derivation:
+    my-custom-shaders = pkgs.fetchFromGitHub {
+      owner = "crosire";
+      repo = "reshade-shaders";
+      rev = "v6.0.0";
+      hash = "sha256-...";
+    };
+
+    # Custom repository with specified subdirectories:
+    advanced-pack = {
+      src = pkgs.fetchFromGitHub {
+        owner = "example-author";
+        repo = "custom-shaders";
+        rev = "main";
+        hash = "sha256-...";
+      };
+      shadersSubdir = "Shaders";          # Subdirectory inside src containing .fx files (default: "Shaders")
+      texturesSubdir = "Textures";        # Subdirectory inside src containing textures (default: "Textures")
+      targetShadersSubdir = "MyPack";     # Nested directory inside ReShade shaders folder
+      targetTexturesSubdir = "MyPack";    # Nested directory inside ReShade textures folder
+    };
+  };
+};
+```
+
+---
+
+## Configuration Examples
+
+### NixOS Module (`configuration.nix`)
 
 ```nix
 { pkgs, ... }: {
@@ -88,35 +152,22 @@ Add this repository to your `flake.nix` inputs:
     # Suppress welcome banner on game launch
     disableWelcomeBar = true;
 
-    # Enable or disable built-in shader packs declaratively
+    # Manually choose which shader packs to include
     builtinPacks = {
-      legacy = true;           # Standard ReShade shaders (crosire)
-      sweetfx = true;          # SweetFX shaders (CeeJay.dk)
-      quint = true;            # qUINT framework (Marty McFly / Pascal Gilcher)
-      prod80 = true;           # Color grading shaders (prod80)
-      otisfx = true;           # Cinematic photography shaders (Frans Bouma / Otis_Inf)
-      fubax = true;            # Optical effects shaders (Fubaxiusz)
-      astrayfx = true;         # Clarity and depth effects (BlueSkyDefender)
-      immerse = true;          # iMMERSE Marty's Mods (Marty McFly / Pascal Gilcher)
-      gshade = true;           # GShade & PPFX Bloom (Mortalitas)
-      reshadeTextures = true;  # Consolidated textures and LUTs (Bhhl)
-      barbatos = true;         # XeGTAO, SSR, DLAA-T, GI (BarbatosAWLS)
-    };
-
-    # Optional custom shader packs
-    extraPacks = {
-      custom-shaders = pkgs.fetchFromGitHub {
-        owner = "crosire";
-        repo = "reshade-shaders";
-        rev = "master";
-        hash = "sha256-...";
-      };
+      legacy = true;
+      sweetfx = true;
+      quint = true;
+      prod80 = true;
+      otisfx = true;
+      astrayfx = true;
+      immerse = true;
+      reshadeTextures = true;
     };
   };
 }
 ```
 
-### 2. Home Manager Module (`home.nix`)
+### Home Manager Module (`home.nix`)
 
 ```nix
 { pkgs, ... }: {
@@ -126,6 +177,20 @@ Add this repository to your `flake.nix` inputs:
     hotkeys = {
       overlay = "Shift+F6";
       effects = "Shift+F5";
+    };
+
+    builtinPacks = {
+      legacy = true;
+      sweetfx = true;
+      quint = true;
+      prod80 = true;
+      otisfx = true;
+      fubax = true;
+      astrayfx = true;
+      immerse = true;
+      gshade = true;
+      reshadeTextures = true;
+      barbatos = true;
     };
 
     # Optional addons enabled declaratively

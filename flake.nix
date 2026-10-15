@@ -21,6 +21,7 @@
   in {
     lib = {
       inherit (hotkeyLib) toReShadeHotkey;
+      defaultPacks = import ./pkgs/default-packs.nix;
       mkReshade = {
         pkgs,
         version ? "6.8.0-beta.3",
@@ -38,6 +39,21 @@
 
     packages = forAllSystems (pkgs: let
       reshade = pkgs.callPackage ./pkgs/reshade.nix {};
+      reshadeFull = pkgs.callPackage ./pkgs/reshade.nix {
+        builtinPacks = {
+          legacy = true;
+          sweetfx = true;
+          quint = true;
+          prod80 = true;
+          otisfx = true;
+          fubax = true;
+          astrayfx = true;
+          immerse = true;
+          gshade = true;
+          reshadeTextures = true;
+          barbatos = true;
+        };
+      };
       reshadeRun = pkgs.callPackage ./pkgs/tools/reshade-run.nix {inherit reshade;};
       reshadeBin = pkgs.writeShellScriptBin "reshade" ''
         exec ${reshadeRun}/bin/reshade-run "$@"
@@ -46,6 +62,7 @@
     in {
       default = reshade;
       reshade = reshade;
+      reshade-full = reshadeFull;
       reshade-run = reshadeRun;
       reshade-bin = reshadeBin;
       reshade-preset = reshadePreset;
@@ -68,6 +85,7 @@
 
     overlays.default = final: prev: {
       reshade = self.packages.${prev.system}.reshade;
+      reshade-full = self.packages.${prev.system}.reshade-full;
       reshade-run = self.packages.${prev.system}.reshade-run;
       reshade-preset = self.packages.${prev.system}.reshade-preset;
     };

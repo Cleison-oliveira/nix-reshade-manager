@@ -61,57 +61,57 @@ in {
     builtinPacks = {
       legacy = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "Standard ReShade shader repository (by crosire / reshade-shaders).";
       };
       sweetfx = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "SweetFX shader suite (by CeeJay.dk / CeeJayDK).";
       };
       quint = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "qUINT shader framework (by Pascal Gilcher / martymcmodding).";
       };
       prod80 = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "Color correction and grading shaders (by prod80).";
       };
       otisfx = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "OtisFX cinematic shaders and camera tools (by Frans Bouma / Otis_Inf).";
       };
       fubax = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "Fubax optical and styling shaders (by Fubaxiusz).";
       };
       astrayfx = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "AstrayFX clarity and depth shaders (by BlueSkyDefender / Clarity.fx).";
       };
       immerse = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "iMMERSE Marty's Mods (by Pascal Gilcher / MartysMods_SHARPEN, MartysMods_SMAA).";
       };
       gshade = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "GShade & PPFX Bloom collection (by Mortalitas and community).";
       };
       reshadeTextures = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "Consolidated textures, blue noise and LUTs collection (curated by Bhhl).";
       };
       barbatos = mkOption {
         type = types.bool;
-        default = true;
+        default = false;
         description = "Barbatos shaders (XeGTAO, SSR, DLAA-T, GI by BarbatosAWLS).";
       };
     };
