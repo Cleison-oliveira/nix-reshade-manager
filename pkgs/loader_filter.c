@@ -275,6 +275,33 @@ static void sanitize_name(char *dst, const char *src, size_t max_len) {
     }
 }
 
+static int is_generic_dir_name(const char *name) {
+    if (!name || name[0] == '\0') return 1;
+    char lower[64] = {0};
+    size_t len = strlen(name);
+    if (len >= sizeof(lower)) len = sizeof(lower) - 1;
+    for (size_t i = 0; i < len; i++) lower[i] = (char)tolower((unsigned char)name[i]);
+    lower[len] = '\0';
+
+    return (strcmp(lower, "pfx") == 0 ||
+            strcmp(lower, "prefix") == 0 ||
+            strcmp(lower, "default") == 0 ||
+            strcmp(lower, "pc") == 0 ||
+            strcmp(lower, "bin") == 0 ||
+            strcmp(lower, "binaries") == 0 ||
+            strcmp(lower, "bin64") == 0 ||
+            strcmp(lower, "bin32") == 0 ||
+            strcmp(lower, "x64") == 0 ||
+            strcmp(lower, "x86") == 0 ||
+            strcmp(lower, "win64") == 0 ||
+            strcmp(lower, "win32") == 0 ||
+            strcmp(lower, "shipping") == 0 ||
+            strcmp(lower, "retail") == 0 ||
+            strcmp(lower, "system") == 0 ||
+            strcmp(lower, "game") == 0 ||
+            strcmp(lower, "games") == 0);
+}
+
 static const char *get_path_label(const char *path, char *buf, size_t buf_len) {
     if (!path || path[0] == '\0' || !buf || buf_len == 0) return "";
     buf[0] = '\0';
@@ -285,13 +312,12 @@ static const char *get_path_label(const char *path, char *buf, size_t buf_len) {
         tmp[--len] = '\0';
     }
     const char *base = get_basename(tmp);
-    if (strcmp(base, "pfx") == 0 || strcmp(base, "prefix") == 0) {
+    while (is_generic_dir_name(base)) {
         char *p = strrchr(tmp, '/');
         if (!p) p = strrchr(tmp, '\\');
-        if (p) {
-            *p = '\0';
-            base = get_basename(tmp);
-        }
+        if (!p) break;
+        *p = '\0';
+        base = get_basename(tmp);
     }
     snprintf(buf, buf_len, "%s", base);
     return buf;
@@ -346,7 +372,7 @@ static void resolve_profile_name(char *out_profile, size_t max_len) {
         char sanitized_label[256];
         sanitize_name(sanitized_label, raw_label, sizeof(sanitized_label));
 
-        if (steam_app_id && steam_app_id[0] != '\0') {
+        if (steam_app_id && steam_app_id[0] != '\0' && strcmp(steam_app_id, "0") != 0) {
             char sanitized_suffix[128];
             sanitize_name(sanitized_suffix, steam_app_id, sizeof(sanitized_suffix));
             snprintf(out_profile, max_len, "%s-%s", sanitized_label, sanitized_suffix);
@@ -376,7 +402,7 @@ static void resolve_profile_name(char *out_profile, size_t max_len) {
 
     char sanitized_base[256];
     sanitize_name(sanitized_base, linux_base, sizeof(sanitized_base));
-    if (steam_app_id && steam_app_id[0] != '\0') {
+    if (steam_app_id && steam_app_id[0] != '\0' && strcmp(steam_app_id, "0") != 0) {
         char sanitized_suffix[128];
         sanitize_name(sanitized_suffix, steam_app_id, sizeof(sanitized_suffix));
         snprintf(out_profile, max_len, "%s-%s", sanitized_base, sanitized_suffix);
@@ -447,6 +473,39 @@ static void write_sanitized_paths(FILE *out, const char *prefix, const char *lin
     fprintf(out, "\n");
 }
 
+static int check_has_about_selected(const char *content) {
+    if (!content) return 0;
+    const char *p = content;
+    while ((p = strstr(p, "Selected=0x")) != NULL) {
+        const char *hash = p + 9;
+        if (strncasecmp(hash, "0xD094CE70", 10) == 0 ||
+            strncasecmp(hash, "0x87856c2f", 10) == 0 ||
+            strncasecmp(hash, "0xCBCD3A85", 10) == 0 ||
+            strncasecmp(hash, "0x63E5D1F5", 10) == 0) {
+            return 1;
+        }
+        p += 19;
+    }
+    return 0;
+}
+
+static void sanitize_docking_line(FILE *out, const char *line) {
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s", line);
+    char *p = buf;
+    while ((p = strstr(p, "Selected=0x")) != NULL) {
+        char *hash = p + 9;
+        if (strncasecmp(hash, "0xD094CE70", 10) == 0 ||
+            strncasecmp(hash, "0x87856c2f", 10) == 0 ||
+            strncasecmp(hash, "0xCBCD3A85", 10) == 0 ||
+            strncasecmp(hash, "0x63E5D1F5", 10) == 0) {
+            memcpy(hash, "0x2863d5fc", 10);
+        }
+        p += 19;
+    }
+    fprintf(out, "%s\n", buf);
+}
+
 static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     ensure_directories_and_preset(profile_dir);
 
@@ -506,10 +565,8 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     content[rd] = '\0';
 
     int has_valid_docking = (strstr(content, "DockNode") != NULL && strstr(content, "Selected=") != NULL);
-    int has_about_selected = (strstr(content, "Selected=0x87856c2f") != NULL ||
-                              strstr(content, "Selected=0xCBCD3A85") != NULL ||
-                              strstr(content, "Selected=0x63E5D1F5") != NULL);
-    int has_valid_window = (strstr(content, "Home###home") != NULL);
+    int has_about_selected = check_has_about_selected(content);
+    int has_valid_window = (strstr(content, "###home") != NULL);
 
     int has_old_nix_store = 0;
     const char *ps = content;
@@ -639,17 +696,9 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
-            if (has_about_selected) {
-                char *sel = strstr(line, "Selected=0x87856c2f");
-                if (!sel) sel = strstr(line, "Selected=0xCBCD3A85");
-                if (!sel) sel = strstr(line, "Selected=0x63E5D1F5");
-                if (sel) {
-                    *sel = '\0';
-                    fprintf(out, "%sSelected=0x2863d5fc%s\n", line, sel + 19);
-                    line = strtok_r(NULL, "\r\n", &saveptr);
-                    continue;
-                }
-            }
+            sanitize_docking_line(out, line);
+            line = strtok_r(NULL, "\r\n", &saveptr);
+            continue;
         }
 
         // Handle Window= line
@@ -775,8 +824,8 @@ int vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLoaderLayerInterfaceVersio
         for (size_t i = 0; i < b; i++) if (cmd[i] == '\0') cmd[i] = ' ';
     }
 
-    if (is_reshade_disabled() || is_launcher_or_helper()) {
-        log_debug("[ReShade Filter] PID %d (%s | %s): Ignored (disabled, launcher or helper process)\n", getpid(), exe, cmd);
+    if (is_reshade_disabled()) {
+        log_debug("[ReShade Filter] PID %d (%s | %s): Ignored (ReShade explicitly disabled)\n", getpid(), exe, cmd);
         return -3;
     }
 
@@ -819,7 +868,7 @@ int vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLoaderLayerInterfaceVersio
 }
 
 void *vkGetInstanceProcAddr(void *instance, const char *pName) {
-    if (is_reshade_disabled() || is_launcher_or_helper()) return NULL;
+    if (is_reshade_disabled()) return NULL;
     init_real_reshade();
     if (!real_gipa && real_func) {
         VkNegotiateLoaderLayerInterfaceVersion vstruct;
