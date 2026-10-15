@@ -120,6 +120,20 @@ with open("'"$out/lib/reshade/ReShade64_orig.so"'", "wb") as f:
 '
       ''}
 
+      # Binary patch: automatically save configuration & active tab when overlay is closed
+      python3 -c '
+with open("'"$out/lib/reshade/ReShade64_orig.so"'", "rb") as f:
+    data = bytearray(f.read())
+pattern = b"\x84\xc0\x74\x11\x48\x8b\x83\x48\x05\x00\x00"
+idx = data.find(pattern)
+if idx != -1:
+    data[idx + 3] = 0x31
+    trampoline = bytes.fromhex("4889dfe8e2cdf0ffebd6")
+    data[idx + 0x35 : idx + 0x35 + 10] = trampoline
+with open("'"$out/lib/reshade/ReShade64_orig.so"'", "wb") as f:
+    f.write(data)
+'
+
       # Prepare loader filter with replaced paths
       cp ${./loader_filter.c} ./loader_filter_src.c
       substituteInPlace ./loader_filter_src.c \

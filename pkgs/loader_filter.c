@@ -18,6 +18,13 @@
 #define DEFAULT_KEY_OVERLAY "117,0,1,0"
 #endif
 
+#define DEFAULT_OVERLAY_DOCKING \
+    "Docking=[Docking][Data],DockSpace   ID=0xB0DF600F Pos=8,,8 Size=1904,,1064 Split=X,  DockNode  ID=0x00000001 Parent=0xB0DF600F SizeRef=671,,1080 Selected=0x63E5D1F5,  DockNode  ID=0x00000002 Parent=0xB0DF600F SizeRef=1247,,1080 CentralNode=1\n"
+
+#define DEFAULT_OVERLAY_WINDOW \
+    "Window=[Window][Debug##Default],Pos=60,,60,Size=400,,400,Collapsed=0,[Window][###home],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,0,[Window][###addons],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,1,[Window][###settings],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,2,[Window][###statistics],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,3,[Window][###log],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,4,[Window][###about],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,5,[Window][###editor],Collapsed=0,DockId=0x00000002,[Window][Viewport],Size=1920,,1080,Collapsed=0\n"
+
+
 typedef struct VkNegotiateLoaderLayerInterfaceVersion {
     int sType;
     void *pNext;
@@ -175,7 +182,9 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
             "\n"
             "[OVERLAY]\n"
             "AutoSavePreset=1\n"
-            "TutorialProgress=4\n",
+            DEFAULT_OVERLAY_DOCKING
+            "TutorialProgress=4\n"
+            DEFAULT_OVERLAY_WINDOW,
             home, cache_dir, preset_path, home
         );
         fclose(out);
@@ -195,6 +204,9 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     fclose(f);
     content[rd] = '\0';
 
+    int has_valid_docking = (strstr(content, "Selected=") != NULL);
+    int has_about_selected = (strstr(content, "Selected=0xCBCD3A85") != NULL);
+
     int needs_fix = 0;
     if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL) {
         needs_fix = 1;
@@ -202,8 +214,15 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     if (strstr(content, "PresetPath=./ReShadePreset.ini") != NULL) {
         needs_fix = 1;
     }
+    if (!has_valid_docking) {
+        needs_fix = 1;
+    }
+    if (has_about_selected) {
+        needs_fix = 1;
+    }
 
-    // If Nix store shaders are already included and preset path is valid, leave untouched!
+    // If Nix store shaders are already included, preset path is valid,
+    // and overlay is not stuck on About or missing docking info, leave untouched!
     if (!needs_fix) {
         free(content);
         chmod(ini_path, 0664);
@@ -215,6 +234,11 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     FILE *out = fopen(tmp_path, "w");
     if (!out) { free(content); return; }
 
+    int has_overlay_section = (strstr(content, "[OVERLAY]") != NULL);
+    int has_docking_line = (strstr(content, "Docking=") != NULL);
+    int has_window_line = (strstr(content, "Window=") != NULL);
+    int has_tutorial = (strstr(content, "TutorialProgress=") != NULL);
+
     char *saveptr = NULL;
     char *line = strtok_r(content, "\r\n", &saveptr);
     int in_general = 0;
@@ -223,6 +247,21 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         if (strcmp(line, "[GENERAL]") == 0) {
             in_general = 1;
             fprintf(out, "%s\n", line);
+            line = strtok_r(NULL, "\r\n", &saveptr);
+            continue;
+        }
+        if (strcmp(line, "[OVERLAY]") == 0) {
+            in_general = 0;
+            fprintf(out, "%s\n", line);
+            if (!has_docking_line) {
+                fputs(DEFAULT_OVERLAY_DOCKING, out);
+            }
+            if (!has_tutorial) {
+                fputs("TutorialProgress=4\n", out);
+            }
+            if (!has_window_line) {
+                fputs(DEFAULT_OVERLAY_WINDOW, out);
+            }
             line = strtok_r(NULL, "\r\n", &saveptr);
             continue;
         }
@@ -266,9 +305,44 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
             }
         }
 
+        // Handle Docking= line
+        if (strncmp(line, "Docking=", 8) == 0) {
+            if (!has_valid_docking) {
+                fputs(DEFAULT_OVERLAY_DOCKING, out);
+                line = strtok_r(NULL, "\r\n", &saveptr);
+                continue;
+            }
+            if (has_about_selected) {
+                char *about_sel = strstr(line, "Selected=0xCBCD3A85");
+                if (about_sel) {
+                    *about_sel = '\0';
+                    fprintf(out, "%sSelected=0x63E5D1F5%s\n", line, about_sel + 19);
+                    line = strtok_r(NULL, "\r\n", &saveptr);
+                    continue;
+                }
+            }
+        }
+
+        // Handle Window= line
+        if (strncmp(line, "Window=", 7) == 0 && !has_valid_docking) {
+            fputs(DEFAULT_OVERLAY_WINDOW, out);
+            line = strtok_r(NULL, "\r\n", &saveptr);
+            continue;
+        }
+
         // All other sections ([INPUT], [OVERLAY], [STYLE], etc.) remain completely untouched!
         fprintf(out, "%s\n", line);
         line = strtok_r(NULL, "\r\n", &saveptr);
+    }
+
+    if (!has_overlay_section) {
+        fprintf(out,
+            "\n[OVERLAY]\n"
+            "AutoSavePreset=1\n"
+            DEFAULT_OVERLAY_DOCKING
+            "TutorialProgress=4\n"
+            DEFAULT_OVERLAY_WINDOW
+        );
     }
 
     fclose(out);
@@ -277,17 +351,8 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     chmod(ini_path, 0664);
 }
 
-static void scan_and_standardize_configs(void) {
-    const char *xdg = getenv("XDG_DATA_HOME");
-    char configs_dir[1024];
-    if (xdg && xdg[0] != '\0') {
-        snprintf(configs_dir, sizeof(configs_dir), "%s/reshade/configurations", xdg);
-    } else {
-        const char *home = getenv("HOME");
-        if (!home) return;
-        snprintf(configs_dir, sizeof(configs_dir), "%s/.local/share/reshade/configurations", home);
-    }
-
+static void scan_configs_in_dir(const char *configs_dir) {
+    if (!configs_dir || configs_dir[0] == '\0') return;
     DIR *d = opendir(configs_dir);
     if (!d) return;
     struct dirent *ent;
@@ -303,6 +368,21 @@ static void scan_and_standardize_configs(void) {
         }
     }
     closedir(d);
+}
+
+static void scan_and_standardize_configs(void) {
+    const char *xdg = getenv("XDG_DATA_HOME");
+    if (xdg && xdg[0] != '\0') {
+        char dir[1024];
+        snprintf(dir, sizeof(dir), "%s/reshade/configurations", xdg);
+        scan_configs_in_dir(dir);
+    }
+    const char *home = getenv("HOME");
+    if (home && home[0] != '\0') {
+        char dir[1024];
+        snprintf(dir, sizeof(dir), "%s/.local/share/reshade/configurations", home);
+        scan_configs_in_dir(dir);
+    }
 }
 
 static void *real_handle = NULL;
