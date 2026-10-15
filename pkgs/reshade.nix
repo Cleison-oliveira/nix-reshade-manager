@@ -122,7 +122,9 @@ with open("'"$out/lib/reshade/ReShade64_orig.so"'", "wb") as f:
 
       # Binary patch: automatically save configuration & active tab when overlay is closed
       python3 -c '
-with open("'"$out/lib/reshade/ReShade64_orig.so"'", "rb") as f:
+import sys
+p = sys.argv[1]
+with open(p, "rb") as f:
     data = bytearray(f.read())
 pattern = b"\x84\xc0\x74\x11\x48\x8b\x83\x48\x05\x00\x00"
 idx = data.find(pattern)
@@ -130,10 +132,24 @@ if idx != -1:
     data[idx + 3] = 0x31
     trampoline = bytes.fromhex("4889dfe8e2cdf0ffebd6")
     data[idx + 0x35 : idx + 0x35 + 10] = trampoline
-with open("'"$out/lib/reshade/ReShade64_orig.so"'", "wb") as f:
+with open(p, "wb") as f:
     f.write(data)
-'
+' "$out/lib/reshade/ReShade64_orig.so"
 
+      # Binary patch: dock default tabs in reverse order so Home (0x2863d5fc) is docked last and selected by default
+      python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "rb") as f:
+    data = bytearray(f.read())
+orig = bytes.fromhex("488b9d78f9ffff48898558f9ffff488b3b8bb5a0f9ffffe8aab0e7ff4883c33048399d58f9ffff75e5")
+rep  = bytes.fromhex("488d58d00f1f0048898558f9ffff488b3b8bb5a0f9ffffe8aab0e7ff4883eb30483b9d78f9ffff73e5")
+idx = data.find(orig)
+if idx != -1:
+    data[idx : idx + len(rep)] = rep
+with open(p, "wb") as f:
+    f.write(data)
+' "$out/lib/reshade/ReShade64_orig.so"
       # Prepare loader filter with replaced paths
       cp ${./loader_filter.c} ./loader_filter_src.c
       substituteInPlace ./loader_filter_src.c \

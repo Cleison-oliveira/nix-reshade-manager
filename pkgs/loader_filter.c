@@ -19,10 +19,10 @@
 #endif
 
 #define DEFAULT_OVERLAY_DOCKING \
-    "Docking=[Docking][Data],DockSpace   ID=0xB0DF600F Pos=8,,8 Size=1904,,1064 Split=X,  DockNode  ID=0x00000001 Parent=0xB0DF600F SizeRef=671,,1080 Selected=0x63E5D1F5,  DockNode  ID=0x00000002 Parent=0xB0DF600F SizeRef=1247,,1080 CentralNode=1\n"
+    "Docking=[Docking][Data],DockSpace   ID=0xB0DF600F Pos=8,,8 Size=1904,,1064 Split=X,  DockNode  ID=0x00000001 Parent=0xB0DF600F SizeRef=671,,1080 Selected=0x2863d5fc,  DockNode  ID=0x00000002 Parent=0xB0DF600F SizeRef=1247,,1080 CentralNode=1\n"
 
 #define DEFAULT_OVERLAY_WINDOW \
-    "Window=[Window][Debug##Default],Pos=60,,60,Size=400,,400,Collapsed=0,[Window][###home],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,0,[Window][###addons],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,1,[Window][###settings],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,2,[Window][###statistics],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,3,[Window][###log],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,4,[Window][###about],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,5,[Window][###editor],Collapsed=0,DockId=0x00000002,[Window][Viewport],Size=1920,,1080,Collapsed=0\n"
+    "Window=[Window][Debug##Default],Pos=60,,60,Size=400,,400,Collapsed=0,[Window][Home###home],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,0,[Window][Add-ons###addons],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,1,[Window][Settings###settings],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,2,[Window][Statistics###statistics],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,3,[Window][Log###log],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,4,[Window][About###about],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,5,[Window][###editor],Collapsed=0,DockId=0x00000002,[Window][Viewport],Size=1920,,1080,Collapsed=0\n"
 
 
 typedef struct VkNegotiateLoaderLayerInterfaceVersion {
@@ -204,8 +204,11 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     fclose(f);
     content[rd] = '\0';
 
-    int has_valid_docking = (strstr(content, "Selected=") != NULL);
-    int has_about_selected = (strstr(content, "Selected=0xCBCD3A85") != NULL);
+    int has_valid_docking = (strstr(content, "DockNode") != NULL && strstr(content, "Selected=") != NULL);
+    int has_about_selected = (strstr(content, "Selected=0x87856c2f") != NULL ||
+                              strstr(content, "Selected=0xCBCD3A85") != NULL ||
+                              strstr(content, "Selected=0x63E5D1F5") != NULL);
+    int has_valid_window = (strstr(content, "Home###home") != NULL);
 
     int needs_fix = 0;
     if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL) {
@@ -218,6 +221,9 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         needs_fix = 1;
     }
     if (has_about_selected) {
+        needs_fix = 1;
+    }
+    if (!has_valid_window) {
         needs_fix = 1;
     }
 
@@ -313,10 +319,12 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
                 continue;
             }
             if (has_about_selected) {
-                char *about_sel = strstr(line, "Selected=0xCBCD3A85");
-                if (about_sel) {
-                    *about_sel = '\0';
-                    fprintf(out, "%sSelected=0x63E5D1F5%s\n", line, about_sel + 19);
+                char *sel = strstr(line, "Selected=0x87856c2f");
+                if (!sel) sel = strstr(line, "Selected=0xCBCD3A85");
+                if (!sel) sel = strstr(line, "Selected=0x63E5D1F5");
+                if (sel) {
+                    *sel = '\0';
+                    fprintf(out, "%sSelected=0x2863d5fc%s\n", line, sel + 19);
                     line = strtok_r(NULL, "\r\n", &saveptr);
                     continue;
                 }
@@ -324,10 +332,12 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         }
 
         // Handle Window= line
-        if (strncmp(line, "Window=", 7) == 0 && !has_valid_docking) {
-            fputs(DEFAULT_OVERLAY_WINDOW, out);
-            line = strtok_r(NULL, "\r\n", &saveptr);
-            continue;
+        if (strncmp(line, "Window=", 7) == 0) {
+            if (!has_valid_window || !has_valid_docking) {
+                fputs(DEFAULT_OVERLAY_WINDOW, out);
+                line = strtok_r(NULL, "\r\n", &saveptr);
+                continue;
+            }
         }
 
         // All other sections ([INPUT], [OVERLAY], [STYLE], etc.) remain completely untouched!
