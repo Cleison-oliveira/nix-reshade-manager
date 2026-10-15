@@ -43,16 +43,12 @@
         exec ${reshadeRun}/bin/reshade-run "$@"
       '';
       reshadePreset = pkgs.callPackage ./pkgs/tools/reshade-preset.nix {};
-      reshadeAddon = pkgs.callPackage ./pkgs/tools/reshade-addon.nix {inherit reshade;};
-      reshadeInstallShaders = pkgs.callPackage ./pkgs/tools/reshade-install-shaders.nix {inherit reshade;};
     in {
       default = reshade;
       reshade = reshade;
       reshade-run = reshadeRun;
       reshade-bin = reshadeBin;
       reshade-preset = reshadePreset;
-      reshade-addon = reshadeAddon;
-      reshade-install-shaders = reshadeInstallShaders;
     });
 
     apps = forAllSystems (pkgs: {
@@ -68,22 +64,12 @@
         type = "app";
         program = "${self.packages.${pkgs.system}.reshade-preset}/bin/reshade-preset";
       };
-      reshade-addon = {
-        type = "app";
-        program = "${self.packages.${pkgs.system}.reshade-addon}/bin/reshade-addon";
-      };
-      reshade-install-shaders = {
-        type = "app";
-        program = "${self.packages.${pkgs.system}.reshade-install-shaders}/bin/reshade-install-shaders";
-      };
     });
 
     overlays.default = final: prev: {
       reshade = self.packages.${prev.system}.reshade;
       reshade-run = self.packages.${prev.system}.reshade-run;
       reshade-preset = self.packages.${prev.system}.reshade-preset;
-      reshade-addon = self.packages.${prev.system}.reshade-addon;
-      reshade-install-shaders = self.packages.${prev.system}.reshade-install-shaders;
     };
 
     nixosModules = {

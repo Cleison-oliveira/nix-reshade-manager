@@ -25,14 +25,6 @@
   '';
 
   reshadePreset = pkgs.callPackage ../pkgs/tools/reshade-preset.nix {};
-
-  reshadeAddon = pkgs.callPackage ../pkgs/tools/reshade-addon.nix {
-    reshade = cfg.package;
-  };
-
-  reshadeInstallShaders = pkgs.callPackage ../pkgs/tools/reshade-install-shaders.nix {
-    reshade = cfg.package;
-  };
 in {
   options.programs.reshade = {
     enable = mkEnableOption "ReShade post-processing injector for Linux Vulkan";
@@ -49,14 +41,14 @@ in {
         type = types.str;
         default = "Shift+F6";
         example = "Home";
-        description = "Hotkey to open/close the ReShade in-game menu (e.g. 'Shift+F6', 'Home', 'Shift+Home', 'F2', or raw '117,0,1,0').";
+        description = "Initial default hotkey to open/close the ReShade in-game menu (e.g. 'Shift+F6', 'Home', 'Shift+Home', 'F2', or raw '117,0,1,0').";
       };
 
       effects = mkOption {
         type = types.str;
         default = "Shift+F5";
         example = "Shift+F5";
-        description = "Hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', or raw '116,0,1,0').";
+        description = "Initial default hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', or raw '116,0,1,0').";
       };
     };
 
@@ -144,7 +136,7 @@ in {
       type = types.listOf types.str;
       default = [];
       example = ["fps_limit"];
-      description = "List of optional addons to enable (e.g. 'fps_limit').";
+      description = "List of optional addons to enable declaratively (e.g. 'fps_limit').";
     };
   };
 
@@ -156,8 +148,6 @@ in {
       reshadeBin
       reshadeRun
       reshadePreset
-      reshadeAddon
-      reshadeInstallShaders
     ];
 
     environment.sessionVariables = {

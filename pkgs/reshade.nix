@@ -120,10 +120,12 @@ with open("'"$out/lib/reshade/ReShade64_orig.so"'", "wb") as f:
 '
       ''}
 
-      # Prepare loader filter with replaced path
+      # Prepare loader filter with replaced paths
       cp ${./loader_filter.c} ./loader_filter_src.c
       substituteInPlace ./loader_filter_src.c \
-        --replace-fail "@ORIG_RESHADE_SO@" "$out/lib/reshade/ReShade64_orig.so"
+        --replace-fail "@ORIG_RESHADE_SO@" "$out/lib/reshade/ReShade64_orig.so" \
+        --replace-fail "@NIX_RESHADE_SHADERS@" "$out/share/reshade/reshade-shaders/Shaders" \
+        --replace-fail "@NIX_RESHADE_TEXTURES@" "$out/share/reshade/reshade-shaders/Textures"
 
       # Compile transparent loader filter with configured hotkeys
       $CC -shared -fPIC -O3 \

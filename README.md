@@ -13,19 +13,18 @@ Compatible with native Linux games, Steam (Proton), Heronite, Heroic Games Launc
   - Prevents injection into desktop launchers (Heroic, Lutris, Heronite, Steam).
   - Ignores Wine/Proton background daemons (`explorer.exe`, `services.exe`, `winedevice.exe`).
   - Supports 64-bit and 32-bit Windows games through Wine New WoW64 (`PROTON_USE_WOW64=1`).
-- Declarative Shader Pack Management:
+- Fully Declarative Shader Packs:
+  - Shaders are packaged into the Nix store and provided directly to ReShade without requiring any installation scripts.
   - Curated built-in packs enabled or disabled individually (crosire, SweetFX, qUINT, prod80, OtisFX, Fubax, AstrayFX, iMMERSE, GShade, Barbatos, Textures).
   - Support for custom declarative packs via `extraPacks`.
-- Standardized Hotkeys:
-  - Configure key combinations using friendly strings (e.g. `"Shift+F6"`, `"Home"`, `"Shift+F5"`, `"ScrollLock"`) or raw ReShade codes.
-  - Default: **Shift + F6** (ReShade menu) and **Shift + F5** (Toggle effects).
+- In-Game UI Modifiable & Persistent Configurations:
+  - Default hotkeys and initial search paths are configured declaratively in Nix.
+  - Any modifications made in-game via the ReShade UI (custom hotkeys, overlay styling, parameters, presets) are saved and preserved permanently in writable user storage (`~/.local/share/reshade/configurations/<game>/`).
 - Welcome Tutorial Suppression:
   - Optional binary patch (`disableWelcomeBar = true`) that permanently suppresses the startup welcome banner.
 - Included CLI Tools:
   - `reshade-run` / `reshade`: Game launcher compatible with Flatpak, Wayland, and Steam.
   - `reshade-preset`: Inspect profiles and presets per game.
-  - `reshade-addon`: Enable and disable optional addons (`.addon64`).
-  - `reshade-install-shaders`: Sync and manage the shader library.
 
 ---
 
@@ -80,7 +79,7 @@ Add this repository to your `flake.nix` inputs:
   programs.reshade = {
     enable = true;
 
-    # In-game hotkeys
+    # Initial default hotkeys (can still be modified in-game via UI)
     hotkeys = {
       overlay = "Shift+F6";   # Open / close ReShade menu
       effects = "Shift+F5";   # Toggle effects on / off
@@ -89,7 +88,7 @@ Add this repository to your `flake.nix` inputs:
     # Suppress welcome banner on game launch
     disableWelcomeBar = true;
 
-    # Enable or disable built-in shader packs
+    # Enable or disable built-in shader packs declaratively
     builtinPacks = {
       legacy = true;           # Standard ReShade shaders (crosire)
       sweetfx = true;          # SweetFX shaders (CeeJay.dk)
@@ -129,10 +128,7 @@ Add this repository to your `flake.nix` inputs:
       effects = "Shift+F5";
     };
 
-    # Automatically sync shader files to ~/.local/share/reshade on activation
-    autoSyncShaders = true;
-
-    # Addons enabled by default
+    # Optional addons enabled declaratively
     defaultAddons = [ "fps_limit" ];
   };
 }
@@ -175,12 +171,12 @@ RESHADE=1 vkcube
 
 ---
 
-## Default Hotkeys
+## Default Hotkeys & In-Game UI Customization
 
 - **Open / Close ReShade Menu**: Shift + F6
 - **Toggle Effects**: Shift + F5
 
-All shader selections, tweaks, and custom presets are automatically saved under `~/.local/share/reshade/configurations/<game>/`.
+All shader selections, tweaks, hotkeys modified via the ReShade Settings tab, and presets are automatically saved and preserved in `~/.local/share/reshade/configurations/<game>/`.
 
 ---
 
@@ -196,15 +192,6 @@ reshade-run -w my-game
 # Inspect game profiles and configuration paths
 reshade-preset list
 reshade-preset dir my-game
-
-# Manage optional addons
-reshade-addon list
-reshade-addon enable fps_limit
-reshade-addon disable fps_limit
-
-# Synchronize or restore shader files
-reshade-install-shaders --sync
-reshade-install-shaders --force
 ```
 
 ---

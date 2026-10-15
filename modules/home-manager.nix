@@ -26,17 +26,12 @@
 
   reshadePreset = pkgs.callPackage ../pkgs/tools/reshade-preset.nix {};
 
-  reshadeAddon = pkgs.callPackage ../pkgs/tools/reshade-addon.nix {
-    reshade = cfg.package;
-  };
-
-  reshadeInstallShaders = pkgs.callPackage ../pkgs/tools/reshade-install-shaders.nix {
-    reshade = cfg.package;
-  };
-
-  enableAddonCmds = lib.concatMapStringsSep "\n" (addon: ''
-    ${reshadeAddon}/bin/reshade-addon enable "${addon}" || true
-  '') cfg.defaultAddons;
+  declarativeAddons = lib.listToAttrs (map (addon: {
+    name = "reshade/${addon}.addon64";
+    value = {
+      source = "${cfg.package}/share/reshade/optional-addons/${addon}.addon64";
+    };
+  }) cfg.defaultAddons);
 in {
   options.programs.reshade = {
     enable = mkEnableOption "ReShade post-processing injector for Linux Vulkan";
@@ -53,14 +48,14 @@ in {
         type = types.str;
         default = "Shift+F6";
         example = "Home";
-        description = "Hotkey to open/close the ReShade in-game menu (e.g. 'Shift+F6', 'Home', 'Shift+Home', 'F2', or raw '117,0,1,0').";
+        description = "Initial default hotkey to open/close the ReShade in-game menu (e.g. 'Shift+F6', 'Home', 'Shift+Home', 'F2', or raw '117,0,1,0').";
       };
 
       effects = mkOption {
         type = types.str;
         default = "Shift+F5";
         example = "Shift+F5";
-        description = "Hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', or raw '116,0,1,0').";
+        description = "Initial default hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', or raw '116,0,1,0').";
       };
     };
 
@@ -68,12 +63,6 @@ in {
       type = types.bool;
       default = true;
       description = "Whether to patch ReShade binary to permanently suppress the initial welcome/tutorial bar on startup.";
-    };
-
-    autoSyncShaders = mkOption {
-      type = types.bool;
-      default = true;
-      description = "Whether to automatically sync the shader collection into ~/.local/share/reshade/reshade-shaders on activation.";
     };
 
     builtinPacks = {
@@ -154,7 +143,7 @@ in {
       type = types.listOf types.str;
       default = [];
       example = ["fps_limit"];
-      description = "List of optional addons to enable (e.g. 'fps_limit').";
+      description = "List of optional addons to enable declaratively (e.g. 'fps_limit').";
     };
   };
 
@@ -164,8 +153,6 @@ in {
       reshadeBin
       reshadeRun
       reshadePreset
-      reshadeAddon
-      reshadeInstallShaders
     ];
 
     home.sessionVariables = {
@@ -174,17 +161,11 @@ in {
     };
 
     # Vulkan manifests for RESHADE=1 and RESHADE_ENABLE=1
-    xdg.dataFile."vulkan/implicit_layer.d/ReShade.json".source =
-      "${cfg.package}/share/vulkan/implicit_layer.d/ReShade.json";
-    xdg.dataFile."vulkan/implicit_layer.d/ReShade64.json".source =
-      "${cfg.package}/share/vulkan/implicit_layer.d/ReShade64.json";
-
-    # Automatic shader library synchronization on activation
-    home.activation.setupReshadeShaders = mkIf cfg.autoSyncShaders (
-      lib.hm.dag.entryAfter ["writeBoundary"] ''
-        $DRY_RUN_CMD ${reshadeInstallShaders}/bin/reshade-install-shaders --sync
-        ${enableAddonCmds}
-      ''
-    );
+    xdg.dataFile = {
+      "vulkan/implicit_layer.d/ReShade.json".source =
+        "${cfg.package}/share/vulkan/implicit_layer.d/ReShade.json";
+      "vulkan/implicit_layer.d/ReShade64.json".source =
+        "${cfg.package}/share/vulkan/implicit_layer.d/ReShade64.json";
+    } // declarativeAddons;
   };
 }

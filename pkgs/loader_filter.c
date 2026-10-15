@@ -79,7 +79,6 @@ static int is_reshade_disabled(void) {
 }
 
 static int is_launcher_or_helper(void) {
-    /* Verifica se o executavel Linux do processo atual e um launcher desktop nativo, compositor ou helper */
     char exe_path[1024];
     ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
     if (n > 0) {
@@ -109,7 +108,21 @@ static int is_launcher_or_helper(void) {
     return 0;
 }
 
-static void standardize_ini_file(const char *ini_path, const char *profile_dir) {
+static void ensure_directories_and_preset(const char *profile_dir) {
+    if (!profile_dir || profile_dir[0] == '\0') return;
+
+    mkdir(profile_dir, 0775);
+
+    const char *cache_root = getenv("XDG_CACHE_HOME");
+    char cache_dir[1024];
+    if (cache_root && cache_root[0] != '\0') {
+        snprintf(cache_dir, sizeof(cache_dir), "%s/reshade", cache_root);
+    } else {
+        const char *home = getenv("HOME");
+        snprintf(cache_dir, sizeof(cache_dir), "%s/.cache/reshade", home ? home : "");
+    }
+    mkdir(cache_dir, 0775);
+
     char preset_path[1024];
     snprintf(preset_path, sizeof(preset_path), "%s/ReShadePreset.ini", profile_dir);
 
@@ -117,101 +130,132 @@ static void standardize_ini_file(const char *ini_path, const char *profile_dir) 
     if (stat(preset_path, &st) != 0) {
         FILE *pf = fopen(preset_path, "w");
         if (pf) {
-            fputs("Techniques=\n", pf);
+            fputs("Techniques=\nTechniqueSorting=\n", pf);
             fclose(pf);
+            chmod(preset_path, 0664);
         }
+    } else {
+        chmod(preset_path, 0664);
+    }
+}
+
+static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
+    ensure_directories_and_preset(profile_dir);
+
+    char preset_path[1024];
+    snprintf(preset_path, sizeof(preset_path), "%s/ReShadePreset.ini", profile_dir);
+
+    const char *home = getenv("HOME");
+    if (!home) home = "";
+
+    const char *cache_root = getenv("XDG_CACHE_HOME");
+    char cache_dir[1024];
+    if (cache_root && cache_root[0] != '\0') {
+        snprintf(cache_dir, sizeof(cache_dir), "%s/reshade", cache_root);
+    } else {
+        snprintf(cache_dir, sizeof(cache_dir), "%s/.cache/reshade", home);
     }
 
     FILE *f = fopen(ini_path, "r");
     if (!f) {
+        // Initial creation with declarative defaults
         FILE *out = fopen(ini_path, "w");
         if (!out) return;
-        const char *data_root = getenv("XDG_DATA_HOME");
-        char shaders_dir[1024];
-        char textures_dir[1024];
-        char cache_dir[1024];
-        if (data_root && data_root[0] != '\0') {
-            snprintf(shaders_dir, sizeof(shaders_dir), "%s/reshade/reshade-shaders/Shaders/**", data_root);
-            snprintf(textures_dir, sizeof(textures_dir), "%s/reshade/reshade-shaders/Textures/**", data_root);
-        } else {
-            const char *home = getenv("HOME");
-            snprintf(shaders_dir, sizeof(shaders_dir), "%s/.local/share/reshade/reshade-shaders/Shaders/**", home ? home : "");
-            snprintf(textures_dir, sizeof(textures_dir), "%s/.local/share/reshade/reshade-shaders/Textures/**", home ? home : "");
-        }
-        const char *cache_root = getenv("XDG_CACHE_HOME");
-        if (cache_root && cache_root[0] != '\0') {
-            snprintf(cache_dir, sizeof(cache_dir), "%s/reshade", cache_root);
-        } else {
-            const char *home = getenv("HOME");
-            snprintf(cache_dir, sizeof(cache_dir), "%s/.cache/reshade", home ? home : "");
-        }
-        fprintf(out, "[GENERAL]\nEffectSearchPaths=%s\nIntermediateCachePath=%s\nPresetPath=%s\nTextureSearchPaths=%s\n\n[INPUT]\nKeyEffects=%s\nKeyOverlay=%s\n\n[OVERLAY]\nAutoSavePreset=1\nTutorialProgress=4\n",
-                shaders_dir, cache_dir, preset_path, textures_dir, DEFAULT_KEY_EFFECTS, DEFAULT_KEY_OVERLAY);
+
+        fprintf(out,
+            "[GENERAL]\n"
+            "EffectSearchPaths=@NIX_RESHADE_SHADERS@/**,%s/.local/share/reshade/reshade-shaders/Shaders/**\n"
+            "IntermediateCachePath=%s\n"
+            "PresetPath=%s\n"
+            "TextureSearchPaths=@NIX_RESHADE_TEXTURES@/**,%s/.local/share/reshade/reshade-shaders/Textures/**\n"
+            "\n"
+            "[INPUT]\n"
+            "KeyEffects=" DEFAULT_KEY_EFFECTS "\n"
+            "KeyOverlay=" DEFAULT_KEY_OVERLAY "\n"
+            "\n"
+            "[OVERLAY]\n"
+            "AutoSavePreset=1\n"
+            "TutorialProgress=4\n",
+            home, cache_dir, preset_path, home
+        );
         fclose(out);
+        chmod(ini_path, 0664);
         return;
     }
 
+    // File exists: inspect without touching user settings
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (sz < 0 || sz > 1024 * 1024) { fclose(f); return; }
+    if (sz <= 0 || sz > 2 * 1024 * 1024) { fclose(f); return; }
+
     char *content = malloc(sz + 1);
     if (!content) { fclose(f); return; }
     size_t rd = fread(content, 1, sz, f);
     fclose(f);
     content[rd] = '\0';
 
-    int modified = 0;
+    int needs_fix = 0;
+    if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL) {
+        needs_fix = 1;
+    }
     if (strstr(content, "PresetPath=./ReShadePreset.ini") != NULL) {
-        modified = 1;
-    }
-    char exp_eff[128];
-    char exp_ovl[128];
-    snprintf(exp_eff, sizeof(exp_eff), "KeyEffects=%s", DEFAULT_KEY_EFFECTS);
-    snprintf(exp_ovl, sizeof(exp_ovl), "KeyOverlay=%s", DEFAULT_KEY_OVERLAY);
-    if (strstr(content, exp_eff) == NULL || strstr(content, exp_ovl) == NULL) {
-        modified = 1;
+        needs_fix = 1;
     }
 
-    if (modified) {
-        char tmp_path[1024];
-        snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", ini_path);
-        FILE *out = fopen(tmp_path, "w");
-        if (!out) { free(content); return; }
+    // If Nix store shaders are already included and preset path is valid, leave untouched!
+    if (!needs_fix) {
+        free(content);
+        chmod(ini_path, 0664);
+        return;
+    }
 
-        char *saveptr = NULL;
-        char *line = strtok_r(content, "\r\n", &saveptr);
-        int has_input = 0;
-        int in_input = 0;
-        int has_overlay = 0;
-        int in_overlay = 0;
+    char tmp_path[1024];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", ini_path);
+    FILE *out = fopen(tmp_path, "w");
+    if (!out) { free(content); return; }
 
-        while (line) {
-            if (strcmp(line, "[INPUT]") == 0) {
-                has_input = 1;
-                in_input = 1;
-                in_overlay = 0;
-                fprintf(out, "%s\nKeyEffects=%s\nKeyOverlay=%s\n", line, DEFAULT_KEY_EFFECTS, DEFAULT_KEY_OVERLAY);
+    char *saveptr = NULL;
+    char *line = strtok_r(content, "\r\n", &saveptr);
+    int in_general = 0;
+
+    while (line) {
+        if (strcmp(line, "[GENERAL]") == 0) {
+            in_general = 1;
+            fprintf(out, "%s\n", line);
+            line = strtok_r(NULL, "\r\n", &saveptr);
+            continue;
+        }
+        if (line[0] == '[') {
+            in_general = 0;
+        }
+
+        if (in_general) {
+            if (strncmp(line, "EffectSearchPaths=", 18) == 0) {
+                if (strstr(line, "@NIX_RESHADE_SHADERS@") == NULL) {
+                    const char *existing = line + 18;
+                    if (*existing) {
+                        fprintf(out, "EffectSearchPaths=@NIX_RESHADE_SHADERS@/**,%s\n", existing);
+                    } else {
+                        fprintf(out, "EffectSearchPaths=@NIX_RESHADE_SHADERS@/**,%s/.local/share/reshade/reshade-shaders/Shaders/**\n", home);
+                    }
+                } else {
+                    fprintf(out, "%s\n", line);
+                }
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
-            if (strcmp(line, "[OVERLAY]") == 0) {
-                has_overlay = 1;
-                in_overlay = 1;
-                in_input = 0;
-                fprintf(out, "%s\nAutoSavePreset=1\nTutorialProgress=4\n", line);
-                line = strtok_r(NULL, "\r\n", &saveptr);
-                continue;
-            }
-            if (line[0] == '[') {
-                in_input = 0;
-                in_overlay = 0;
-            }
-            if (in_input && (strncmp(line, "KeyEffects=", 11) == 0 || strncmp(line, "KeyOverlay=", 11) == 0)) {
-                line = strtok_r(NULL, "\r\n", &saveptr);
-                continue;
-            }
-            if (in_overlay && (strncmp(line, "TutorialProgress=", 17) == 0 || strncmp(line, "AutoSavePreset=", 15) == 0)) {
+            if (strncmp(line, "TextureSearchPaths=", 19) == 0) {
+                if (strstr(line, "@NIX_RESHADE_TEXTURES@") == NULL) {
+                    const char *existing = line + 19;
+                    if (*existing) {
+                        fprintf(out, "TextureSearchPaths=@NIX_RESHADE_TEXTURES@/**,%s\n", existing);
+                    } else {
+                        fprintf(out, "TextureSearchPaths=@NIX_RESHADE_TEXTURES@/**,%s/.local/share/reshade/reshade-shaders/Textures/**\n", home);
+                    }
+                } else {
+                    fprintf(out, "%s\n", line);
+                }
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
@@ -220,20 +264,17 @@ static void standardize_ini_file(const char *ini_path, const char *profile_dir) 
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
-            fprintf(out, "%s\n", line);
-            line = strtok_r(NULL, "\r\n", &saveptr);
         }
 
-        if (!has_input) {
-            fprintf(out, "\n[INPUT]\nKeyEffects=%s\nKeyOverlay=%s\n", DEFAULT_KEY_EFFECTS, DEFAULT_KEY_OVERLAY);
-        }
-        if (!has_overlay) {
-            fprintf(out, "\n[OVERLAY]\nAutoSavePreset=1\nTutorialProgress=4\n");
-        }
-        fclose(out);
-        rename(tmp_path, ini_path);
+        // All other sections ([INPUT], [OVERLAY], [STYLE], etc.) remain completely untouched!
+        fprintf(out, "%s\n", line);
+        line = strtok_r(NULL, "\r\n", &saveptr);
     }
+
+    fclose(out);
     free(content);
+    rename(tmp_path, ini_path);
+    chmod(ini_path, 0664);
 }
 
 static void scan_and_standardize_configs(void) {
@@ -258,7 +299,7 @@ static void scan_and_standardize_configs(void) {
         if (stat(pdir, &st) == 0 && S_ISDIR(st.st_mode)) {
             char ini[1024];
             snprintf(ini, sizeof(ini), "%s/ReShade.ini", pdir);
-            standardize_ini_file(ini, pdir);
+            setup_profile_ini(ini, pdir);
         }
     }
     closedir(d);
@@ -286,7 +327,6 @@ static int hook_vkCreateInstance(const void *pCreateInfo, const void *pAllocator
         real_createInstance = (PFN_vkCreateInstance)real_gipa(NULL, "vkCreateInstance");
     }
     int res = real_createInstance ? real_createInstance(pCreateInfo, pAllocator, pInstance) : -3;
-    scan_and_standardize_configs();
     log_debug("[ReShade Filter] PID %d: vkCreateInstance executed, res=%d\n", getpid(), res);
     return res;
 }
