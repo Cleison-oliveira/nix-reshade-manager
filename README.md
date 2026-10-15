@@ -289,6 +289,52 @@ This project is built upon the open source ReShade ecosystem and brings together
 
 ---
 
+## Automated Testing & Shader Verification
+
+An automated verification test suite is provided to validate that every single shader across all curated packs compiles without any compilation errors, HLSL resource hazards, or Vulkan descriptor pool exhaustion.
+
+```bash
+# Run the automated test suite directly via Nix
+nix run github:Cleison-oliveira/nix-reshade-manager#test-shaders
+
+# Or run locally from this repository
+nix run .#test-shaders
+# Or:
+./tests/test-shaders.sh
+```
+
+### What the Automated Test Validates:
+1. Builds a standalone instance of ReShade with **all built-in shader packs enabled** (`reshade-full`).
+2. Spawns an isolated Vulkan environment using `vkcube` with temporary sandboxed XDG data and cache directories.
+3. Automatically parses `ReShade.log` upon completion to verify:
+   - Over 900+ shaders were discovered and compiled.
+   - Zero HLSL compilation errors (`error X...`).
+   - Zero resource hazards or texture binding collisions.
+   - Zero Vulkan descriptor pool exhaustion errors (`Failed to create sampler descriptor table`).
+
+---
+
+## Stability & Shader Compilation Fixes
+
+### 1. Vulkan Descriptor Pool Expansion (Fixing Pool Exhaustion)
+- **Problem**: Upstream ReShade hardcodes conservative descriptor limits in `source/vulkan/vulkan_impl_device.cpp` (only 128 samplers and 128 uniform buffers). When enabling rich shader packs (such as iMMERSE, Barbatos, or qUINT), loading more than 128 shaders causes Vulkan to exhaust its descriptor pool, throwing `Failed to create sampler descriptor table for effect file ...` or `Failed to create constant buffer descriptor table ...` and failing to load subsequent effects.
+- **Solution**: The derivation applies a binary patch to `ReShade64_orig.so`, increasing the descriptor limits to 8,192 samplers and UBOs and 16,384 maximum descriptor sets. This allows all shader packs to compile and execute concurrently without pool exhaustion.
+
+### 2. AstrayFX Shader Hazard Fixes (HLSL Error X3020)
+- **Problem**: Several shaders from the AstrayFX pack failed to compile with:
+  `error X3020: cannot sample from texture that is also used as render target in the same pass`
+  - In `SnowScape.fx`: A single `SmoothNormals` function branched based on direction, referencing `N_Sampler_A` (which samples `Normals_A`) while rendering pass `Alpha` into `RenderTarget0 = Normals_A`.
+  - In `RadiantGI.fx`: Pass `CopyFrame` sampled `PCGIcurrColor` (`PCGIcurrColorTex`) in `Ublur()` while setting `RenderTarget0 = PCGIcurrColorTex`.
+- **Solution**:
+  - `SnowScape.fx`: Separated into two distinct directional smoothing routines (`SmoothNormalsH` and `SmoothNormalsV`) so pass `Alpha` never references `N_Sampler_A`.
+  - `RadiantGI.fx`: Replaced `PCGIcurrColor` with `BackBufferPCGI` in `CurrentFrame`, sampling the source backbuffer instead of the target texture.
+
+### 3. Declarative Search Path Sanitization
+- **Problem**: Changing NixOS generations or updating the flake changed the `/nix/store/...` hash. In previous iterations, old store paths accumulated in `ReShade.ini`, causing ReShade worker threads to scan and compile 4-5 duplicate copies of every shader in parallel, exhausting CPU cache and leading to race conditions.
+- **Solution**: `loader_filter.c` automatically purges obsolete `/nix/store/...` paths, ensures the current authoritative Nix store path is prioritized, and preserves user custom paths without duplication.
+
+---
+
 ## License
 
 Distributed under the BSD-3-Clause license, matching upstream ReShade. Individual shader packs remain under their respective licenses specified by their authors in their repositories.

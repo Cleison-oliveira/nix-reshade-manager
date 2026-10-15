@@ -24,7 +24,6 @@
 #define DEFAULT_OVERLAY_WINDOW \
     "Window=[Window][Debug##Default],Pos=60,,60,Size=400,,400,Collapsed=0,[Window][Home###home],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,0,[Window][Add-ons###addons],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,1,[Window][Settings###settings],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,2,[Window][Statistics###statistics],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,3,[Window][Log###log],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,4,[Window][About###about],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,5,[Window][###editor],Collapsed=0,DockId=0x00000002,[Window][Viewport],Size=1920,,1080,Collapsed=0\n"
 
-
 typedef struct VkNegotiateLoaderLayerInterfaceVersion {
     int sType;
     void *pNext;
@@ -38,6 +37,23 @@ typedef int (*PFN_vkNegotiate)(VkNegotiateLoaderLayerInterfaceVersion *);
 typedef void *(*PFN_vkVoidFunction)(void);
 typedef void *(*PFN_vkGetInstanceProcAddr)(void *instance, const char *pName);
 typedef int (*PFN_vkCreateInstance)(const void *pCreateInfo, const void *pAllocator, void *pInstance);
+
+static void mkdir_p(const char *dir) {
+    if (!dir || dir[0] == '\0') return;
+    char tmp[1024];
+    snprintf(tmp, sizeof(tmp), "%s", dir);
+    size_t len = strlen(tmp);
+    if (len == 0) return;
+    if (tmp[len - 1] == '/') tmp[len - 1] = '\0';
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0775);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0775);
+}
 
 static void log_debug(const char *fmt, ...) {
     const char *no_log = getenv("RESHADE_DISABLE_LOGGING");
@@ -53,7 +69,7 @@ static void log_debug(const char *fmt, ...) {
         if (!home) return;
         snprintf(dir, sizeof(dir), "%s/.local/share/reshade", home);
     }
-    mkdir(dir, 0755);
+    mkdir_p(dir);
     snprintf(path, sizeof(path), "%s/loader_filter.log", dir);
     FILE *f = fopen(path, "a");
     if (!f) return;
@@ -118,7 +134,7 @@ static int is_launcher_or_helper(void) {
 static void ensure_directories_and_preset(const char *profile_dir) {
     if (!profile_dir || profile_dir[0] == '\0') return;
 
-    mkdir(profile_dir, 0775);
+    mkdir_p(profile_dir);
 
     const char *cache_root = getenv("XDG_CACHE_HOME");
     char cache_dir[1024];
@@ -128,7 +144,16 @@ static void ensure_directories_and_preset(const char *profile_dir) {
         const char *home = getenv("HOME");
         snprintf(cache_dir, sizeof(cache_dir), "%s/.cache/reshade", home ? home : "");
     }
-    mkdir(cache_dir, 0775);
+    mkdir_p(cache_dir);
+
+    const char *home = getenv("HOME");
+    if (home && home[0] != '\0') {
+        char user_s[1024], user_t[1024];
+        snprintf(user_s, sizeof(user_s), "%s/.local/share/reshade/reshade-shaders/Shaders", home);
+        snprintf(user_t, sizeof(user_t), "%s/.local/share/reshade/reshade-shaders/Textures", home);
+        mkdir_p(user_s);
+        mkdir_p(user_t);
+    }
 
     char preset_path[1024];
     snprintf(preset_path, sizeof(preset_path), "%s/ReShadePreset.ini", profile_dir);
@@ -144,6 +169,28 @@ static void ensure_directories_and_preset(const char *profile_dir) {
     } else {
         chmod(preset_path, 0664);
     }
+}
+
+static void write_sanitized_paths(FILE *out, const char *prefix, const char *line_val, const char *primary_path, const char *user_fallback) {
+    fprintf(out, "%s%s", prefix, primary_path);
+    if (line_val && *line_val) {
+        char buf[4096];
+        snprintf(buf, sizeof(buf), "%s", line_val);
+        char *tok_save = NULL;
+        char *tok = strtok_r(buf, ",", &tok_save);
+        while (tok) {
+            while (*tok == ' ' || *tok == '\t') tok++;
+            int is_nix = (strncmp(tok, "/nix/store/", 11) == 0);
+            int is_cur = (strstr(tok, primary_path) != NULL || strstr(primary_path, tok) != NULL);
+            if (!is_nix && !is_cur && *tok) {
+                fprintf(out, ",%s", tok);
+            }
+            tok = strtok_r(NULL, ",", &tok_save);
+        }
+    } else if (user_fallback && *user_fallback) {
+        fprintf(out, ",%s", user_fallback);
+    }
+    fprintf(out, "\n");
 }
 
 static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
@@ -210,25 +257,28 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
                               strstr(content, "Selected=0x63E5D1F5") != NULL);
     int has_valid_window = (strstr(content, "Home###home") != NULL);
 
+    int has_old_nix_store = 0;
+    const char *ps = content;
+    while ((ps = strstr(ps, "/nix/store/")) != NULL) {
+        if (strncmp(ps, "@NIX_RESHADE_SHADERS@", strlen("@NIX_RESHADE_SHADERS@")) != 0 &&
+            strncmp(ps, "@NIX_RESHADE_TEXTURES@", strlen("@NIX_RESHADE_TEXTURES@")) != 0) {
+            has_old_nix_store = 1;
+            break;
+        }
+        ps += 11;
+    }
+
     int needs_fix = 0;
-    if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL) {
+    if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL || has_old_nix_store) {
         needs_fix = 1;
     }
     if (strstr(content, "PresetPath=./ReShadePreset.ini") != NULL) {
         needs_fix = 1;
     }
-    if (!has_valid_docking) {
-        needs_fix = 1;
-    }
-    if (has_about_selected) {
-        needs_fix = 1;
-    }
-    if (!has_valid_window) {
+    if (!has_valid_docking || has_about_selected || !has_valid_window) {
         needs_fix = 1;
     }
 
-    // If Nix store shaders are already included, preset path is valid,
-    // and overlay is not stuck on About or missing docking info, leave untouched!
     if (!needs_fix) {
         free(content);
         chmod(ini_path, 0664);
@@ -277,30 +327,16 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
 
         if (in_general) {
             if (strncmp(line, "EffectSearchPaths=", 18) == 0) {
-                if (strstr(line, "@NIX_RESHADE_SHADERS@") == NULL) {
-                    const char *existing = line + 18;
-                    if (*existing) {
-                        fprintf(out, "EffectSearchPaths=@NIX_RESHADE_SHADERS@/**,%s\n", existing);
-                    } else {
-                        fprintf(out, "EffectSearchPaths=@NIX_RESHADE_SHADERS@/**,%s/.local/share/reshade/reshade-shaders/Shaders/**\n", home);
-                    }
-                } else {
-                    fprintf(out, "%s\n", line);
-                }
+                char user_def[1024];
+                snprintf(user_def, sizeof(user_def), "%s/.local/share/reshade/reshade-shaders/Shaders/**", home);
+                write_sanitized_paths(out, "EffectSearchPaths=", line + 18, "@NIX_RESHADE_SHADERS@/**", user_def);
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
             if (strncmp(line, "TextureSearchPaths=", 19) == 0) {
-                if (strstr(line, "@NIX_RESHADE_TEXTURES@") == NULL) {
-                    const char *existing = line + 19;
-                    if (*existing) {
-                        fprintf(out, "TextureSearchPaths=@NIX_RESHADE_TEXTURES@/**,%s\n", existing);
-                    } else {
-                        fprintf(out, "TextureSearchPaths=@NIX_RESHADE_TEXTURES@/**,%s/.local/share/reshade/reshade-shaders/Textures/**\n", home);
-                    }
-                } else {
-                    fprintf(out, "%s\n", line);
-                }
+                char user_def[1024];
+                snprintf(user_def, sizeof(user_def), "%s/.local/share/reshade/reshade-shaders/Textures/**", home);
+                write_sanitized_paths(out, "TextureSearchPaths=", line + 19, "@NIX_RESHADE_TEXTURES@/**", user_def);
                 line = strtok_r(NULL, "\r\n", &saveptr);
                 continue;
             }
@@ -340,7 +376,6 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
             }
         }
 
-        // All other sections ([INPUT], [OVERLAY], [STYLE], etc.) remain completely untouched!
         fprintf(out, "%s\n", line);
         line = strtok_r(NULL, "\r\n", &saveptr);
     }
@@ -454,6 +489,24 @@ int vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLoaderLayerInterfaceVersio
 
     log_debug("[ReShade Filter] PID %d (%s | %s): Negotiating interface version %u...\n",
               getpid(), exe, cmd, pVersionStruct ? pVersionStruct->loaderLayerInterfaceVersion : 0);
+
+    // Pre-initialize and standardize profile for the current process
+    const char *app_name = get_basename(exe);
+    if (app_name && *app_name) {
+        const char *xdg = getenv("XDG_DATA_HOME");
+        char pdir[1024], ini[1024];
+        if (xdg && xdg[0] != '\0') {
+            snprintf(pdir, sizeof(pdir), "%s/reshade/configurations/%s", xdg, app_name);
+            snprintf(ini, sizeof(ini), "%s/ReShade.ini", pdir);
+            setup_profile_ini(ini, pdir);
+        }
+        const char *home = getenv("HOME");
+        if (home && home[0] != '\0') {
+            snprintf(pdir, sizeof(pdir), "%s/.local/share/reshade/configurations/%s", home, app_name);
+            snprintf(ini, sizeof(ini), "%s/ReShade.ini", pdir);
+            setup_profile_ini(ini, pdir);
+        }
+    }
 
     scan_and_standardize_configs();
     init_real_reshade();

@@ -59,6 +59,7 @@
         exec ${reshadeRun}/bin/reshade-run "$@"
       '';
       reshadePreset = pkgs.callPackage ./pkgs/tools/reshade-preset.nix {};
+      testShaders = pkgs.callPackage ./pkgs/tools/test-shaders.nix {inherit reshadeFull;};
     in {
       default = reshade;
       reshade = reshade;
@@ -66,6 +67,7 @@
       reshade-run = reshadeRun;
       reshade-bin = reshadeBin;
       reshade-preset = reshadePreset;
+      test-shaders = testShaders;
     });
 
     apps = forAllSystems (pkgs: {
@@ -81,6 +83,10 @@
         type = "app";
         program = "${self.packages.${pkgs.system}.reshade-preset}/bin/reshade-preset";
       };
+      test-shaders = {
+        type = "app";
+        program = "${self.packages.${pkgs.system}.test-shaders}/bin/reshade-test-shaders";
+      };
     });
 
     overlays.default = final: prev: {
@@ -88,6 +94,7 @@
       reshade-full = self.packages.${prev.system}.reshade-full;
       reshade-run = self.packages.${prev.system}.reshade-run;
       reshade-preset = self.packages.${prev.system}.reshade-preset;
+      test-shaders = self.packages.${prev.system}.test-shaders;
     };
 
     nixosModules = {

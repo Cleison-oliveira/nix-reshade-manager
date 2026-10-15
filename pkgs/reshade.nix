@@ -150,6 +150,31 @@ if idx != -1:
 with open(p, "wb") as f:
     f.write(data)
 ' "$out/lib/reshade/ReShade64_orig.so"
+
+      # Binary patch: increase Vulkan descriptor pool limits for effects
+      # Allows hundreds of shaders to compile without descriptor pool exhaustion
+      python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "rb") as f:
+    data = bytearray(f.read())
+
+p1 = bytes.fromhex("0000000080000000010000000004000002000000000400000300000000020000")
+r1 = bytes.fromhex("0000000000200000010000000040000002000000004000000300000000100000")
+idx1 = data.find(p1)
+if idx1 != -1:
+    data[idx1:idx1+len(r1)] = r1
+
+p2 = bytes.fromhex("06000000800000002000000005000000ffffffff000000000100000000020000")
+r2 = bytes.fromhex("06000000002000002000000005000000ffffffff000000000100000000400000")
+idx2 = data.find(p2)
+if idx2 != -1:
+    data[idx2:idx2+len(r2)] = r2
+
+with open(p, "wb") as f:
+    f.write(data)
+' "$out/lib/reshade/ReShade64_orig.so"
+
       # Prepare loader filter with replaced paths
       cp ${./loader_filter.c} ./loader_filter_src.c
       substituteInPlace ./loader_filter_src.c \
@@ -193,6 +218,94 @@ with open(p, "wb") as f:
         [ -f "$sdir/ReShadeUI.fxh" ] && ln -sf ReShadeUI.fxh "$sdir/ReshadeUI.fxh" && ln -sf ReShadeUI.fxh "$sdir/reshadeui.fxh" || true
       done
       find "$out/share/reshade" -name "*.fx" -exec sed -i 's/"Reshade\.fxh"/"ReShade\.fxh"/g' {} + 2>/dev/null || true
+
+      # Fix AstrayFX compilation hazards (error X3020 sampling from render target)
+      python3 -c '
+import os, sys
+shaders_dir = sys.argv[1]
+
+snow_path = os.path.join(shaders_dir, "AstrayFX/OneShot/SnowScape.fx")
+if os.path.exists(snow_path):
+    with open(snow_path, "r", encoding="utf-8", errors="ignore") as f:
+        c = f.read()
+    old_sn = """float3 SmoothNormals(float2 TC, int NS,int Dir, float SNOffset)
+{   //Smooth Normals done in two passes now Faster. But, still slow.
+\tfloat4 StoredNormals_Depth = float4(Dir ? DepthNormals(TC) : tex2Dlod(N_Sampler_A,float4(TC,0,0)).xyz,DepthM(TC).x), SmoothedNormals = float4(StoredNormals_Depth.xyz,1);
+
+\t[loop] // -1 0 +1 on x and y
+\tfor(float xy = -NS; xy <= NS; xy++)
+\t{
+\t\tif(smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff)
+\t\t\tbreak;
+\t\tfloat2 XY = Dir ? float2(xy,0) : float2(0,xy);
+\t\tfloat2 offsetcoords = TC + XY * pix * SNOffset;
+\t\tfloat4 Normals_Depth     = float4(Dir ? DepthNormals(offsetcoords) : tex2Dlod(N_Sampler_A,float4(offsetcoords,0,0)).xyz,DepthM(offsetcoords).x);
+\t\tif (abs(StoredNormals_Depth.w - Normals_Depth.w) < 0.001 && dot(Normals_Depth.xyz, StoredNormals_Depth.xyz) > 0.5f)
+\t\t{
+\t\t\tSmoothedNormals.xyz += Normals_Depth.xyz;
+\t\t\t++SmoothedNormals.w;
+\t\t}
+\t}
+
+\treturn SmoothedNormals.xyz / SmoothedNormals.w;
+}"""
+    new_sn = """float3 SmoothNormalsH(float2 TC, int NS, float SNOffset)
+{
+\tfloat4 StoredNormals_Depth = float4(DepthNormals(TC), DepthM(TC).x), SmoothedNormals = float4(StoredNormals_Depth.xyz,1);
+
+\t[loop]
+\tfor(float xy = -NS; xy <= NS; xy++)
+\t{
+\t\tif(smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff)
+\t\t\tbreak;
+\t\tfloat2 XY = float2(xy,0);
+\t\tfloat2 offsetcoords = TC + XY * pix * SNOffset;
+\t\tfloat4 Normals_Depth = float4(DepthNormals(offsetcoords), DepthM(offsetcoords).x);
+\t\tif (abs(StoredNormals_Depth.w - Normals_Depth.w) < 0.001 && dot(Normals_Depth.xyz, StoredNormals_Depth.xyz) > 0.5f)
+\t\t{
+\t\t\tSmoothedNormals.xyz += Normals_Depth.xyz;
+\t\t\t++SmoothedNormals.w;
+\t\t}
+\t}
+
+\treturn SmoothedNormals.xyz / SmoothedNormals.w;
+}
+
+float3 SmoothNormalsV(float2 TC, int NS, float SNOffset)
+{
+\tfloat4 StoredNormals_Depth = float4(tex2Dlod(N_Sampler_A,float4(TC,0,0)).xyz, DepthM(TC).x), SmoothedNormals = float4(StoredNormals_Depth.xyz,1);
+
+\t[loop]
+\tfor(float xy = -NS; xy <= NS; xy++)
+\t{
+\t\tif(smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff)
+\t\t\tbreak;
+\t\tfloat2 XY = float2(0,xy);
+\t\tfloat2 offsetcoords = TC + XY * pix * SNOffset;
+\t\tfloat4 Normals_Depth = float4(tex2Dlod(N_Sampler_A,float4(offsetcoords,0,0)).xyz, DepthM(offsetcoords).x);
+\t\tif (abs(StoredNormals_Depth.w - Normals_Depth.w) < 0.001 && dot(Normals_Depth.xyz, StoredNormals_Depth.xyz) > 0.5f)
+\t\t{
+\t\t\tSmoothedNormals.xyz += Normals_Depth.xyz;
+\t\t\t++SmoothedNormals.w;
+\t\t}
+\t}
+
+\treturn SmoothedNormals.xyz / SmoothedNormals.w;
+}"""
+    c = c.replace(old_sn, new_sn)
+    c = c.replace("Normals = SmoothNormals(texcoord, SN_offset.x, 1, SN_offset.y);", "Normals = SmoothNormalsH(texcoord, SN_offset.x, SN_offset.y);")
+    c = c.replace("Normals_LM = float4(SmoothNormals(texcoord, SN_offset.x, 0, SN_offset.y).xyz,DepthM(texcoord).x);", "Normals_LM = float4(SmoothNormalsV(texcoord, SN_offset.x, SN_offset.y).xyz,DepthM(texcoord).x);")
+    with open(snow_path, "w", encoding="utf-8") as f:
+        f.write(c)
+
+radiant_path = os.path.join(shaders_dir, "AstrayFX/RadiantGI.fx")
+if os.path.exists(radiant_path):
+    with open(radiant_path, "r", encoding="utf-8", errors="ignore") as f:
+        c = f.read()
+    c = c.replace("Ublur( PCGIcurrColor, texcoords, 5, 100)", "Ublur( BackBufferPCGI, texcoords, 5, 100)")
+    with open(radiant_path, "w", encoding="utf-8") as f:
+        f.write(c)
+' "$out/share/reshade/reshade-shaders/Shaders" 
 
       # Main Vulkan manifest for RESHADE=1
       cat << 'MANIFEST_EOF' > $out/share/vulkan/implicit_layer.d/ReShade.json
