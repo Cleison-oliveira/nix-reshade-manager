@@ -19,12 +19,11 @@ let
       builtins.foldl' replaceChar str chars;
 
   keyMap = {
-    # Disabled / None / Vazio / Empty
+    # Disabled / None / Empty
     "NONE" = 0;
     "OFF" = 0;
     "DISABLED" = 0;
     "0" = 0;
-    "VAZIO" = 0;
     "EMPTY" = 0;
 
     # Function keys (F1 - F24)
@@ -103,7 +102,7 @@ let
     "SLASH" = 191;
   };
 
-  # Converts a human-friendly string (e.g. "Shift+F6", "Ctrl+Alt+Home", "Home", "None", "Vazio", "", null) or raw "117,0,1,0"
+  # Converts a human-friendly string (e.g. "Shift+F6", "Ctrl+Alt+Home", "Home", "None", "Empty", "", null) or raw "117,0,1,0"
   toReShadeHotkey = input:
     if input == null
     then "0,0,0,0"
@@ -111,7 +110,7 @@ let
       trimmed = builtins.replaceStrings [" "] [""] input;
       upperInput = toUpper trimmed;
     in
-      if upperInput == "" || upperInput == "NONE" || upperInput == "OFF" || upperInput == "DISABLED" || upperInput == "0" || upperInput == "VAZIO" || upperInput == "EMPTY"
+      if upperInput == "" || upperInput == "NONE" || upperInput == "OFF" || upperInput == "DISABLED" || upperInput == "0" || upperInput == "EMPTY"
       then "0,0,0,0"
       else let
         isRaw = builtins.match "[0-9]+,[0-1],[0-1],[0-1]" trimmed != null;
@@ -133,7 +132,7 @@ let
           code =
             if keyMap ? ${baseKey}
             then keyMap.${baseKey}
-            else if baseKey == "NONE" || baseKey == "VAZIO" || baseKey == "EMPTY" then 0
+            else if baseKey == "NONE" || baseKey == "EMPTY" then 0
             else 36; # Fallback to Home
 
           ctrlVal = if hasCtrl && code != 0 then "1" else "0";
