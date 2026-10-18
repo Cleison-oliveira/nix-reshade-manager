@@ -11,12 +11,13 @@ reshade-run - Native ReShade launcher for Linux Vulkan
 
 USAGE:
   reshade-run [OPTIONS] <command> [args...]
-  reshade-run %command%                  (Steam Launch Options)
-  reshade-run flatpak run <app-id>       (Flatpak games/emulators)
+  reshade-run %command%                  (Launcher launch options syntax)
+  reshade-run flatpak run <app-id>       (Flatpak applications)
 
-ENVIRONMENT VARIABLES (alternative for non-Steam games, Heronite, Heroic, Lutris):
+ENVIRONMENT VARIABLES:
   RESHADE=1 <command>                    Enable ReShade via environment variable
   RESHADE_ENABLE=1 <command>             Alternative syntax
+  DISABLE_RESHADE=1 <command>            Explicitly disable ReShade
 
 OPTIONS:
   -p, --profile <NAME>  Set an explicit ReShade profile
