@@ -136,6 +136,20 @@ with open(p, "wb") as f:
     f.write(data)
 ' "$out/lib/reshade/ReShade64_orig.so"
 
+      # Binary patch: dock default tabs in reverse order so Home is docked last and selected by default
+      python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "rb") as f:
+    data = bytearray(f.read())
+orig = bytes.fromhex("488b9d78f9ffff48898558f9ffff488b3b8bb5a0f9ffffe8aab0e7ff4883c33048399d58f9ffff75e5")
+rep  = bytes.fromhex("488d58d00f1f0048898558f9ffff488b3b8bb5a0f9ffffe8aab0e7ff4883eb30483b9d78f9ffff73e5")
+idx = data.find(orig)
+if idx != -1:
+    data[idx : idx + len(rep)] = rep
+with open(p, "wb") as f:
+    f.write(data)
+' "$out/lib/reshade/ReShade64_orig.so"
 
       # Binary patch: increase Vulkan descriptor pool limits for effects
       # Allows hundreds of shaders to compile without descriptor pool exhaustion
