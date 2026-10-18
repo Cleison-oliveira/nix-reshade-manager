@@ -1,5 +1,5 @@
 # ReShade keycode converter
-# Format: <VirtualKeyCode>,<Ctrl>,<Shift>,<Alt> (e.g. "117,0,1,0" for Shift+F6)
+# Format: <VirtualKeyCode>,<Ctrl>,<Shift>,<Alt> (e.g. "117,0,1,0" for Shift+F6, "0,0,0,0" for empty/unbound)
 let
   toUpper = str:
     let
@@ -19,11 +19,13 @@ let
       builtins.foldl' replaceChar str chars;
 
   keyMap = {
-    # Disabled / None
+    # Disabled / None / Vazio / Empty
     "NONE" = 0;
     "OFF" = 0;
     "DISABLED" = 0;
     "0" = 0;
+    "VAZIO" = 0;
+    "EMPTY" = 0;
 
     # Function keys (F1 - F24)
     "F1" = 112; "F2" = 113; "F3" = 114; "F4" = 115;
@@ -101,41 +103,44 @@ let
     "SLASH" = 191;
   };
 
-  # Converts a human-friendly string (e.g. "Shift+F6", "Ctrl+Alt+Home", "Home", "None") or raw "117,0,1,0"
-  toReShadeHotkey = input: let
-    trimmed = builtins.replaceStrings [" "] [""] input;
-    upperInput = toUpper trimmed;
-  in
-    if upperInput == "" || upperInput == "NONE" || upperInput == "OFF" || upperInput == "DISABLED" || upperInput == "0"
+  # Converts a human-friendly string (e.g. "Shift+F6", "Ctrl+Alt+Home", "Home", "None", "Vazio", "", null) or raw "117,0,1,0"
+  toReShadeHotkey = input:
+    if input == null
     then "0,0,0,0"
     else let
-      isRaw = builtins.match "[0-9]+,[0-1],[0-1],[0-1]" trimmed != null;
+      trimmed = builtins.replaceStrings [" "] [""] input;
+      upperInput = toUpper trimmed;
     in
-      if isRaw
-      then trimmed
+      if upperInput == "" || upperInput == "NONE" || upperInput == "OFF" || upperInput == "DISABLED" || upperInput == "0" || upperInput == "VAZIO" || upperInput == "EMPTY"
+      then "0,0,0,0"
       else let
-        # Split by '+' or '-'
-        parts = builtins.filter (x: builtins.isString x && x != "") (builtins.split "[+-]" trimmed);
-        upperParts = map (p: toUpper p) parts;
-
-        hasCtrl = builtins.elem "CTRL" upperParts || builtins.elem "CONTROL" upperParts;
-        hasShift = builtins.elem "SHIFT" upperParts;
-        hasAlt = builtins.elem "ALT" upperParts;
-
-        baseParts = builtins.filter (p: p != "CTRL" && p != "CONTROL" && p != "SHIFT" && p != "ALT") upperParts;
-        baseKey = if baseParts != [] then builtins.head baseParts else "NONE";
-
-        code =
-          if keyMap ? ${baseKey}
-          then keyMap.${baseKey}
-          else if baseKey == "NONE" then 0
-          else 36; # Fallback to Home
-
-        ctrlVal = if hasCtrl && code != 0 then "1" else "0";
-        shiftVal = if hasShift && code != 0 then "1" else "0";
-        altVal = if hasAlt && code != 0 then "1" else "0";
+        isRaw = builtins.match "[0-9]+,[0-1],[0-1],[0-1]" trimmed != null;
       in
-        "${toString code},${ctrlVal},${shiftVal},${altVal}";
+        if isRaw
+        then trimmed
+        else let
+          # Split by '+' or '-'
+          parts = builtins.filter (x: builtins.isString x && x != "") (builtins.split "[+-]" trimmed);
+          upperParts = map (p: toUpper p) parts;
+
+          hasCtrl = builtins.elem "CTRL" upperParts || builtins.elem "CONTROL" upperParts;
+          hasShift = builtins.elem "SHIFT" upperParts;
+          hasAlt = builtins.elem "ALT" upperParts;
+
+          baseParts = builtins.filter (p: p != "CTRL" && p != "CONTROL" && p != "SHIFT" && p != "ALT") upperParts;
+          baseKey = if baseParts != [] then builtins.head baseParts else "NONE";
+
+          code =
+            if keyMap ? ${baseKey}
+            then keyMap.${baseKey}
+            else if baseKey == "NONE" || baseKey == "VAZIO" || baseKey == "EMPTY" then 0
+            else 36; # Fallback to Home
+
+          ctrlVal = if hasCtrl && code != 0 then "1" else "0";
+          shiftVal = if hasShift && code != 0 then "1" else "0";
+          altVal = if hasAlt && code != 0 then "1" else "0";
+        in
+          "${toString code},${ctrlVal},${shiftVal},${altVal}";
 in {
   inherit toReShadeHotkey;
 }

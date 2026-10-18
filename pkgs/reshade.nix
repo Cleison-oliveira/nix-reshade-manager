@@ -24,6 +24,8 @@
   version ? "6.8.0-beta.3",
 }: let
   defaultPacks = (import ./default-packs.nix {inherit fetchFromGitHub;});
+  hotkeyLib = import ./hotkeys.nix;
+  safeKey = k: hotkeyLib.toReShadeHotkey (if k == null then "" else k);
 
   # Filter active built-in packs based on user preferences (default to false)
   activeBuiltinPacks =
@@ -241,12 +243,12 @@ with open(p, "wb") as f:
 
       # Compile transparent loader filter with configured hotkeys
       $CC -shared -fPIC -O3 \
-        -DDEFAULT_KEY_OVERLAY="\"${keyOverlay}\"" \
-        -DDEFAULT_KEY_EFFECTS="\"${keyEffects}\"" \
-        -DDEFAULT_KEY_RELOAD="\"${keyReload}\"" \
-        -DDEFAULT_KEY_NEXT_PRESET="\"${keyNextPreset}\"" \
-        -DDEFAULT_KEY_PREVIOUS_PRESET="\"${keyPreviousPreset}\"" \
-        -DDEFAULT_KEY_SCREENSHOT="\"${keyScreenshot}\"" \
+        -DDEFAULT_KEY_OVERLAY="\"${safeKey keyOverlay}\"" \
+        -DDEFAULT_KEY_EFFECTS="\"${safeKey keyEffects}\"" \
+        -DDEFAULT_KEY_RELOAD="\"${safeKey keyReload}\"" \
+        -DDEFAULT_KEY_NEXT_PRESET="\"${safeKey keyNextPreset}\"" \
+        -DDEFAULT_KEY_PREVIOUS_PRESET="\"${safeKey keyPreviousPreset}\"" \
+        -DDEFAULT_KEY_SCREENSHOT="\"${safeKey keyScreenshot}\"" \
         ./loader_filter_src.c \
         -o $out/lib/reshade/ReShade64.so \
         -ldl

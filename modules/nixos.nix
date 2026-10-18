@@ -42,45 +42,45 @@ in {
 
     hotkeys = {
       overlay = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
         default = "Shift+F6";
         example = "Home";
-        description = "Initial default hotkey to open/close the ReShade in-game menu (e.g. 'Shift+F6', 'Home', 'Shift+Home', 'F2', or raw '117,0,1,0').";
+        description = "Initial default hotkey to open/close the ReShade in-game menu (e.g. 'Shift+F6', 'Home', 'None', or null/empty).";
       };
 
       effects = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
         default = "Shift+F5";
         example = "Shift+F5";
-        description = "Initial default hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', or raw '116,0,1,0').";
+        description = "Initial default hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', 'None', or null/empty).";
       };
 
       reload = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
         default = "None";
         example = "Shift+F4";
-        description = "Initial default hotkey to reload all effects and textures (e.g. 'Shift+F4', 'Ctrl+Shift+R', or 'None').";
+        description = "Initial default hotkey to reload all effects and textures (e.g. 'Shift+F4', 'Ctrl+Shift+R', 'None', or null/empty).";
       };
 
       nextPreset = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
         default = "None";
         example = "PageUp";
-        description = "Initial default hotkey to switch to the next preset (e.g. 'PageUp', 'Shift+F8', or 'None').";
+        description = "Initial default hotkey to switch to the next preset (e.g. 'PageUp', 'Shift+F8', 'None', or null/empty).";
       };
 
       previousPreset = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
         default = "None";
         example = "PageDown";
-        description = "Initial default hotkey to switch to the previous preset (e.g. 'PageDown', 'Shift+F7', or 'None').";
+        description = "Initial default hotkey to switch to the previous preset (e.g. 'PageDown', 'Shift+F7', 'None', or null/empty).";
       };
 
       screenshot = mkOption {
-        type = types.str;
+        type = types.nullOr types.str;
         default = "None";
         example = "PrintScreen";
-        description = "Initial default hotkey to take a screenshot (e.g. 'PrintScreen', 'Shift+F12', or 'None').";
+        description = "Initial default hotkey to take a screenshot (e.g. 'PrintScreen', 'Shift+F12', 'None', or null/empty).";
       };
     };
 
