@@ -16,6 +16,7 @@
   keyOverlay ? "117,0,1,0",
   keyEffects ? "116,0,1,0",
   disableWelcomeBar ? true,
+  showOverlayOnStartup ? false,
   version ? "6.8.0-beta.3",
 }: let
   defaultPacks = (import ./default-packs.nix {inherit fetchFromGitHub;});
@@ -136,20 +137,54 @@ with open(p, "wb") as f:
     f.write(data)
 ' "$out/lib/reshade/ReShade64_orig.so"
 
-      # Binary patch: dock default tabs in reverse order so Home is docked last and selected by default
+      # Binary patch: iterate overlay callbacks in reverse order (About -> ... -> Home) in draw_gui()
+      # This ensures Home is submitted last, placing it at the top of ImGui focus order so it is naturally focused on startup
+      # Also patch DockNodeUpdateTabBar fallback from Tabs.back() to Tabs.front() so uninitialized docks select Home
       python3 -c '
 import sys
 p = sys.argv[1]
 with open(p, "rb") as f:
     data = bytearray(f.read())
-orig = bytes.fromhex("488b9d78f9ffff48898558f9ffff488b3b8bb5a0f9ffffe8aab0e7ff4883c33048399d58f9ffff75e5")
-rep  = bytes.fromhex("488d58d00f1f0048898558f9ffff488b3b8bb5a0f9ffffe8aab0e7ff4883eb30483b9d78f9ffff73e5")
-idx = data.find(orig)
-if idx != -1:
-    data[idx : idx + len(rep)] = rep
+
+# 1. Reverse overlay_callbacks loop in runtime::draw_gui
+p2_orig = bytes.fromhex("488b8558f9ffff4883c3304839c375bf")
+p2_rep  = bytes.fromhex("4883eb30483b9d78f9ffff73c2909090")
+idx2 = data.find(p2_orig)
+if idx2 != -1:
+    idx1 = idx2 - 0x38
+    p1_orig = bytes.fromhex("488b9d78f9ffff")
+    p1_rep  = bytes.fromhex("488d9d90fcffff")
+    if data[idx1:idx1+len(p1_orig)] == p1_orig:
+        data[idx1:idx1+len(p1_rep)] = p1_rep
+        data[idx2:idx2+len(p2_rep)] = p2_rep
+
+# 2. DockNodeUpdateTabBar fallback: select Tabs.front() instead of Tabs.back()
+p3_orig = bytes.fromhex("488b4c2408488d14c5000000004829c2488d04d50000000048034110488b40d0660f6e80c0000000660f70c0e0660fd64120")
+p3_rep  = bytes.fromhex("488b4c2408488b4110488b4008" + "90"*19 + "660f6e80c0000000660f70c0e0660fd64120")
+idx3 = data.find(p3_orig)
+if idx3 != -1:
+    data[idx3:idx3+len(p3_rep)] = p3_rep
+
 with open(p, "wb") as f:
     f.write(data)
 ' "$out/lib/reshade/ReShade64_orig.so"
+
+      ${lib.optionalString showOverlayOnStartup ''
+        # Binary patch: automatically open overlay on startup
+        python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "rb") as f:
+    data = bytearray(f.read())
+orig = bytes.fromhex("31c00fb68751050000888560f9ffff")
+rep  = bytes.fromhex("b00188875105000090888560f9ffff")
+idx = data.find(orig)
+if idx != -1:
+    data[idx:idx+len(rep)] = rep
+with open(p, "wb") as f:
+    f.write(data)
+' "$out/lib/reshade/ReShade64_orig.so"
+      ''}
 
       # Binary patch: increase Vulkan descriptor pool limits for effects
       # Allows hundreds of shaders to compile without descriptor pool exhaustion
