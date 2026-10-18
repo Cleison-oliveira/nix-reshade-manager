@@ -10,10 +10,14 @@
 
   keyOverlay = hotkeyLib.toReShadeHotkey cfg.hotkeys.overlay;
   keyEffects = hotkeyLib.toReShadeHotkey cfg.hotkeys.effects;
+  keyReload = hotkeyLib.toReShadeHotkey cfg.hotkeys.reload;
+  keyNextPreset = hotkeyLib.toReShadeHotkey cfg.hotkeys.nextPreset;
+  keyPreviousPreset = hotkeyLib.toReShadeHotkey cfg.hotkeys.previousPreset;
+  keyScreenshot = hotkeyLib.toReShadeHotkey cfg.hotkeys.screenshot;
 
   defaultPackage = pkgs.callPackage ../pkgs/reshade.nix {
     inherit (cfg) builtinPacks extraPacks disableWelcomeBar;
-    inherit keyOverlay keyEffects;
+    inherit keyOverlay keyEffects keyReload keyNextPreset keyPreviousPreset keyScreenshot;
   };
 
   reshadeRun = pkgs.callPackage ../pkgs/tools/reshade-run.nix {
@@ -49,6 +53,34 @@ in {
         default = "Shift+F5";
         example = "Shift+F5";
         description = "Initial default hotkey to toggle post-processing effects on/off (e.g. 'Shift+F5', 'ScrollLock', or raw '116,0,1,0').";
+      };
+
+      reload = mkOption {
+        type = types.str;
+        default = "None";
+        example = "Shift+F4";
+        description = "Initial default hotkey to reload all effects and textures (e.g. 'Shift+F4', 'Ctrl+Shift+R', or 'None').";
+      };
+
+      nextPreset = mkOption {
+        type = types.str;
+        default = "None";
+        example = "PageUp";
+        description = "Initial default hotkey to switch to the next preset (e.g. 'PageUp', 'Shift+F8', or 'None').";
+      };
+
+      previousPreset = mkOption {
+        type = types.str;
+        default = "None";
+        example = "PageDown";
+        description = "Initial default hotkey to switch to the previous preset (e.g. 'PageDown', 'Shift+F7', or 'None').";
+      };
+
+      screenshot = mkOption {
+        type = types.str;
+        default = "None";
+        example = "PrintScreen";
+        description = "Initial default hotkey to take a screenshot (e.g. 'PrintScreen', 'Shift+F12', or 'None').";
       };
     };
 

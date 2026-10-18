@@ -29,12 +29,16 @@
         extraPacks ? {},
         keyOverlay ? "117,0,1,0",
         keyEffects ? "116,0,1,0",
+        keyReload ? "0,0,0,0",
+        keyNextPreset ? "0,0,0,0",
+        keyPreviousPreset ? "0,0,0,0",
+        keyScreenshot ? "0,0,0,0",
         disableWelcomeBar ? true,
         showOverlayOnStartup ? false,
       }:
         pkgs.callPackage ./pkgs/reshade.nix {
           inherit version builtinPacks extraPacks disableWelcomeBar showOverlayOnStartup;
-          inherit keyOverlay keyEffects;
+          inherit keyOverlay keyEffects keyReload keyNextPreset keyPreviousPreset keyScreenshot;
         };
     };
 

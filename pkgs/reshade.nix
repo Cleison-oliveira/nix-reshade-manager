@@ -15,6 +15,10 @@
   extraPacks ? {},
   keyOverlay ? "117,0,1,0",
   keyEffects ? "116,0,1,0",
+  keyReload ? "0,0,0,0",
+  keyNextPreset ? "0,0,0,0",
+  keyPreviousPreset ? "0,0,0,0",
+  keyScreenshot ? "0,0,0,0",
   disableWelcomeBar ? true,
   showOverlayOnStartup ? false,
   version ? "6.8.0-beta.3",
@@ -169,6 +173,24 @@ with open(p, "wb") as f:
     f.write(data)
 ' "$out/lib/reshade/ReShade64_orig.so"
 
+      # Binary patch: allow closing/exiting the ReShade overlay with ESC key
+      python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "rb") as f:
+    data = bytearray(f.read())
+
+prefix = bytes.fromhex("498b7c2478be1b000000e89aa6fbff84c00f8492ecffff")
+idx = data.find(prefix)
+if idx != -1:
+    patch_start = idx + len(prefix)
+    rep = bytes.fromhex("c68560f9ffff00e9c1ecffff" + "90" * 70)
+    data[patch_start : patch_start + len(rep)] = rep
+
+with open(p, "wb") as f:
+    f.write(data)
+' "$out/lib/reshade/ReShade64_orig.so"
+
       ${lib.optionalString showOverlayOnStartup ''
         # Binary patch: automatically open overlay on startup
         python3 -c '
@@ -221,6 +243,10 @@ with open(p, "wb") as f:
       $CC -shared -fPIC -O3 \
         -DDEFAULT_KEY_OVERLAY="\"${keyOverlay}\"" \
         -DDEFAULT_KEY_EFFECTS="\"${keyEffects}\"" \
+        -DDEFAULT_KEY_RELOAD="\"${keyReload}\"" \
+        -DDEFAULT_KEY_NEXT_PRESET="\"${keyNextPreset}\"" \
+        -DDEFAULT_KEY_PREVIOUS_PRESET="\"${keyPreviousPreset}\"" \
+        -DDEFAULT_KEY_SCREENSHOT="\"${keyScreenshot}\"" \
         ./loader_filter_src.c \
         -o $out/lib/reshade/ReShade64.so \
         -ldl

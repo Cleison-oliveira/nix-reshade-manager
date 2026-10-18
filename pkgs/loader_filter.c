@@ -18,6 +18,22 @@
 #define DEFAULT_KEY_OVERLAY "117,0,1,0"
 #endif
 
+#ifndef DEFAULT_KEY_RELOAD
+#define DEFAULT_KEY_RELOAD "0,0,0,0"
+#endif
+
+#ifndef DEFAULT_KEY_NEXT_PRESET
+#define DEFAULT_KEY_NEXT_PRESET "0,0,0,0"
+#endif
+
+#ifndef DEFAULT_KEY_PREVIOUS_PRESET
+#define DEFAULT_KEY_PREVIOUS_PRESET "0,0,0,0"
+#endif
+
+#ifndef DEFAULT_KEY_SCREENSHOT
+#define DEFAULT_KEY_SCREENSHOT "0,0,0,0"
+#endif
+
 #define DEFAULT_OVERLAY_DOCKING \
     "Docking=[Docking][Data],DockSpace   ID=0xB0DF600F Window=0xCC18005E Pos=8,,8 Size=1904,,1064 Split=X,  DockNode  ID=0x00000001 Parent=0xB0DF600F SizeRef=671,,1080 Selected=0xCBCD3A85,  DockNode  ID=0x00000002 Parent=0xB0DF600F SizeRef=1247,,1080 CentralNode=1\n"
 
@@ -538,8 +554,12 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
             "TextureSearchPaths=@NIX_RESHADE_TEXTURES@/**,%s/.local/share/reshade/reshade-shaders/Textures/**\n"
             "\n"
             "[INPUT]\n"
-            "KeyEffects=" DEFAULT_KEY_EFFECTS "\n"
             "KeyOverlay=" DEFAULT_KEY_OVERLAY "\n"
+            "KeyEffects=" DEFAULT_KEY_EFFECTS "\n"
+            "KeyNextPreset=" DEFAULT_KEY_NEXT_PRESET "\n"
+            "KeyPreviousPreset=" DEFAULT_KEY_PREVIOUS_PRESET "\n"
+            "KeyReload=" DEFAULT_KEY_RELOAD "\n"
+            "KeyScreenshot=" DEFAULT_KEY_SCREENSHOT "\n"
             "\n"
             "[OVERLAY]\n"
             "AutoSavePreset=1\n"
@@ -584,6 +604,10 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     int has_input_section = (strstr(content, "[INPUT]") != NULL);
     int has_fallback_key_overlay = (strstr(content, "KeyOverlay=36,0,0,0") != NULL && strcmp(DEFAULT_KEY_OVERLAY, "36,0,0,0") != 0);
     int has_zero_key_effects = (strstr(content, "KeyEffects=0,0,0,0") != NULL && strcmp(DEFAULT_KEY_EFFECTS, "0,0,0,0") != 0);
+    int has_key_reload = (strstr(content, "KeyReload=") != NULL);
+    int has_key_next = (strstr(content, "KeyNextPreset=") != NULL);
+    int has_key_prev = (strstr(content, "KeyPreviousPreset=") != NULL);
+    int has_key_screenshot = (strstr(content, "KeyScreenshot=") != NULL);
 
     int needs_fix = 0;
     if (strstr(content, "@NIX_RESHADE_SHADERS@") == NULL || has_old_nix_store) {
@@ -598,6 +622,10 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
     if (!has_input_section || has_fallback_key_overlay || has_zero_key_effects) {
         needs_fix = 1;
     }
+    if (!has_key_reload && strcmp(DEFAULT_KEY_RELOAD, "0,0,0,0") != 0) needs_fix = 1;
+    if (!has_key_next && strcmp(DEFAULT_KEY_NEXT_PRESET, "0,0,0,0") != 0) needs_fix = 1;
+    if (!has_key_prev && strcmp(DEFAULT_KEY_PREVIOUS_PRESET, "0,0,0,0") != 0) needs_fix = 1;
+    if (!has_key_screenshot && strcmp(DEFAULT_KEY_SCREENSHOT, "0,0,0,0") != 0) needs_fix = 1;
 
     if (!needs_fix) {
         free(content);
@@ -652,6 +680,24 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
             continue;
         }
         if (line[0] == '[') {
+            if (in_input) {
+                if (!has_key_reload && strcmp(DEFAULT_KEY_RELOAD, "0,0,0,0") != 0) {
+                    fprintf(out, "KeyReload=%s\n", DEFAULT_KEY_RELOAD);
+                    has_key_reload = 1;
+                }
+                if (!has_key_next && strcmp(DEFAULT_KEY_NEXT_PRESET, "0,0,0,0") != 0) {
+                    fprintf(out, "KeyNextPreset=%s\n", DEFAULT_KEY_NEXT_PRESET);
+                    has_key_next = 1;
+                }
+                if (!has_key_prev && strcmp(DEFAULT_KEY_PREVIOUS_PRESET, "0,0,0,0") != 0) {
+                    fprintf(out, "KeyPreviousPreset=%s\n", DEFAULT_KEY_PREVIOUS_PRESET);
+                    has_key_prev = 1;
+                }
+                if (!has_key_screenshot && strcmp(DEFAULT_KEY_SCREENSHOT, "0,0,0,0") != 0) {
+                    fprintf(out, "KeyScreenshot=%s\n", DEFAULT_KEY_SCREENSHOT);
+                    has_key_screenshot = 1;
+                }
+            }
             in_general = 0;
             in_input = 0;
         }
@@ -716,11 +762,30 @@ static void setup_profile_ini(const char *ini_path, const char *profile_dir) {
         line = strtok_r(NULL, "\r\n", &saveptr);
     }
 
+    if (in_input) {
+        if (!has_key_reload && strcmp(DEFAULT_KEY_RELOAD, "0,0,0,0") != 0) {
+            fprintf(out, "KeyReload=%s\n", DEFAULT_KEY_RELOAD);
+        }
+        if (!has_key_next && strcmp(DEFAULT_KEY_NEXT_PRESET, "0,0,0,0") != 0) {
+            fprintf(out, "KeyNextPreset=%s\n", DEFAULT_KEY_NEXT_PRESET);
+        }
+        if (!has_key_prev && strcmp(DEFAULT_KEY_PREVIOUS_PRESET, "0,0,0,0") != 0) {
+            fprintf(out, "KeyPreviousPreset=%s\n", DEFAULT_KEY_PREVIOUS_PRESET);
+        }
+        if (!has_key_screenshot && strcmp(DEFAULT_KEY_SCREENSHOT, "0,0,0,0") != 0) {
+            fprintf(out, "KeyScreenshot=%s\n", DEFAULT_KEY_SCREENSHOT);
+        }
+    }
+
     if (!has_input_section) {
         fprintf(out,
             "\n[INPUT]\n"
-            "KeyEffects=" DEFAULT_KEY_EFFECTS "\n"
             "KeyOverlay=" DEFAULT_KEY_OVERLAY "\n"
+            "KeyEffects=" DEFAULT_KEY_EFFECTS "\n"
+            "KeyNextPreset=" DEFAULT_KEY_NEXT_PRESET "\n"
+            "KeyPreviousPreset=" DEFAULT_KEY_PREVIOUS_PRESET "\n"
+            "KeyReload=" DEFAULT_KEY_RELOAD "\n"
+            "KeyScreenshot=" DEFAULT_KEY_SCREENSHOT "\n"
         );
     }
 
