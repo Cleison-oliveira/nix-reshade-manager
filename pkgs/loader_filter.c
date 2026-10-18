@@ -19,7 +19,7 @@
 #endif
 
 #define DEFAULT_OVERLAY_DOCKING \
-    "Docking=[Docking][Data],DockSpace   ID=0xB0DF600F Pos=8,,8 Size=1904,,1064 Split=X,  DockNode  ID=0x00000001 Parent=0xB0DF600F SizeRef=671,,1080 Selected=0x2863d5fc,  DockNode  ID=0x00000002 Parent=0xB0DF600F SizeRef=1247,,1080 CentralNode=1\n"
+    "Docking=[Docking][Data],DockSpace   ID=0xB0DF600F Pos=8,,8 Size=1904,,1064 Split=X,  DockNode  ID=0x00000001 Parent=0xB0DF600F SizeRef=671,,1080 Selected=0xCBCD3A85,  DockNode  ID=0x00000002 Parent=0xB0DF600F SizeRef=1247,,1080 CentralNode=1\n"
 
 #define DEFAULT_OVERLAY_WINDOW \
     "Window=[Window][Debug##Default],Pos=60,,60,Size=400,,400,Collapsed=0,[Window][Home###home],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,0,[Window][Add-ons###addons],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,1,[Window][Settings###settings],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,2,[Window][Statistics###statistics],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,3,[Window][Log###log],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,4,[Window][About###about],Pos=8,,8,Size=671,,1064,Collapsed=0,DockId=0x00000001,,5,[Window][###editor],Collapsed=0,DockId=0x00000002,[Window][Viewport],Size=1920,,1080,Collapsed=0\n"
@@ -480,8 +480,7 @@ static int check_has_about_selected(const char *content) {
         const char *hash = p + 9;
         if (strncasecmp(hash, "0xD094CE70", 10) == 0 ||
             strncasecmp(hash, "0x87856c2f", 10) == 0 ||
-            strncasecmp(hash, "0xCBCD3A85", 10) == 0 ||
-            strncasecmp(hash, "0x63E5D1F5", 10) == 0) {
+            strncasecmp(hash, "0x2863d5fc", 10) == 0) {
             return 1;
         }
         p += 19;
@@ -497,9 +496,8 @@ static void sanitize_docking_line(FILE *out, const char *line) {
         char *hash = p + 9;
         if (strncasecmp(hash, "0xD094CE70", 10) == 0 ||
             strncasecmp(hash, "0x87856c2f", 10) == 0 ||
-            strncasecmp(hash, "0xCBCD3A85", 10) == 0 ||
-            strncasecmp(hash, "0x63E5D1F5", 10) == 0) {
-            memcpy(hash, "0x2863d5fc", 10);
+            strncasecmp(hash, "0x2863d5fc", 10) == 0) {
+            memcpy(hash, "0xCBCD3A85", 10);
         }
         p += 19;
     }
