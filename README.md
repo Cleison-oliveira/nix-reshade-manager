@@ -42,9 +42,8 @@ Provides high-performance post-processing injection, intelligent background proc
 - **Welcome Tutorial Suppression**:
   - Optional binary patch (`disableWelcomeBar = true`) permanently suppresses the initial startup tutorial/welcome bar.
 
-- **Included CLI Utilities**:
-  - `reshade-run` / `reshade`: Generic application runner with profile selection, Wine Wayland support, and logging controls.
-  - `reshade-preset`: Profile and preset management tool.
+- **Included CLI Utility**:
+  - `reshade`: Unified application runner with profile selection, preset listing, Wine Wayland support, and logging controls.
   - `test-shaders`: Automated test suite to validate shader compilation.
 
 ---
@@ -330,7 +329,7 @@ Add the environment variable or runner to the application launch command:
 
 ```bash
 # Using launch options syntax
-reshade-run %command%
+reshade %command%
 
 # Or using the environment variable directly
 RESHADE=1 %command%
@@ -339,31 +338,28 @@ RESHADE=1 %command%
 ### 3. Flatpak Applications
 
 ```bash
-reshade-run flatpak run <application-id>
+reshade flatpak run <application-id>
 ```
 
 ### 4. Direct Terminal Execution
 
 ```bash
-reshade-run <executable> [arguments...]
+reshade <executable> [arguments...]
 
 # Direct execution with native Wine Wayland enabled
-reshade-run -w <executable>
+reshade -w <executable>
 ```
 
 ---
 
-## CLI Utilities
+## CLI Usage
 
 ```bash
 # Launch any executable with ReShade enabled
-reshade-run [OPTIONS] <command> [args...]
+reshade [OPTIONS] <command> [args...]
 
 # Inspect existing application profiles and active presets
-reshade-preset list
-
-# Print the configuration directory for a specific profile
-reshade-preset dir <profile-name>
+reshade --list
 ```
 
 ---

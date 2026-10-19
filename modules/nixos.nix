@@ -19,16 +19,6 @@
     inherit (cfg) builtinPacks extraPacks disableWelcomeBar;
     inherit keyOverlay keyEffects keyReload keyNextPreset keyPreviousPreset keyScreenshot;
   };
-
-  reshadeRun = pkgs.callPackage ../pkgs/tools/reshade-run.nix {
-    reshade = cfg.package;
-  };
-
-  reshadeBin = pkgs.writeShellScriptBin "reshade" ''
-    exec ${reshadeRun}/bin/reshade-run "$@"
-  '';
-
-  reshadePreset = pkgs.callPackage ../pkgs/tools/reshade-preset.nix {};
 in {
   options.programs.reshade = {
     enable = mkEnableOption "ReShade post-processing injector for Linux Vulkan";
@@ -177,9 +167,6 @@ in {
 
     environment.systemPackages = [
       cfg.package
-      reshadeBin
-      reshadeRun
-      reshadePreset
     ];
 
     environment.sessionVariables = {

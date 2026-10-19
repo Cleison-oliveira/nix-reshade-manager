@@ -59,34 +59,22 @@
           barbatos = true;
         };
       };
-      reshadeRun = pkgs.callPackage ./pkgs/tools/reshade-run.nix {inherit reshade;};
-      reshadeBin = pkgs.writeShellScriptBin "reshade" ''
-        exec ${reshadeRun}/bin/reshade-run "$@"
-      '';
-      reshadePreset = pkgs.callPackage ./pkgs/tools/reshade-preset.nix {};
       testShaders = pkgs.callPackage ./pkgs/tools/test-shaders.nix {inherit reshadeFull;};
     in {
       default = reshade;
       reshade = reshade;
       reshade-full = reshadeFull;
-      reshade-run = reshadeRun;
-      reshade-bin = reshadeBin;
-      reshade-preset = reshadePreset;
       test-shaders = testShaders;
     });
 
     apps = forAllSystems (pkgs: {
       default = {
         type = "app";
-        program = "${self.packages.${pkgs.system}.reshade-run}/bin/reshade-run";
+        program = "${self.packages.${pkgs.system}.reshade}/bin/reshade";
       };
       reshade = {
         type = "app";
-        program = "${self.packages.${pkgs.system}.reshade-run}/bin/reshade-run";
-      };
-      reshade-preset = {
-        type = "app";
-        program = "${self.packages.${pkgs.system}.reshade-preset}/bin/reshade-preset";
+        program = "${self.packages.${pkgs.system}.reshade}/bin/reshade";
       };
       test-shaders = {
         type = "app";
@@ -97,8 +85,6 @@
     overlays.default = final: prev: {
       reshade = self.packages.${prev.system}.reshade;
       reshade-full = self.packages.${prev.system}.reshade-full;
-      reshade-run = self.packages.${prev.system}.reshade-run;
-      reshade-preset = self.packages.${prev.system}.reshade-preset;
       test-shaders = self.packages.${prev.system}.test-shaders;
     };
 

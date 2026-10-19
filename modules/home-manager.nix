@@ -20,16 +20,6 @@
     inherit keyOverlay keyEffects keyReload keyNextPreset keyPreviousPreset keyScreenshot;
   };
 
-  reshadeRun = pkgs.callPackage ../pkgs/tools/reshade-run.nix {
-    reshade = cfg.package;
-  };
-
-  reshadeBin = pkgs.writeShellScriptBin "reshade" ''
-    exec ${reshadeRun}/bin/reshade-run "$@"
-  '';
-
-  reshadePreset = pkgs.callPackage ../pkgs/tools/reshade-preset.nix {};
-
   declarativeAddons = lib.listToAttrs (map (addon: {
     name = "reshade/${addon}.addon64";
     value = {
@@ -182,9 +172,6 @@ in {
   config = mkIf cfg.enable {
     home.packages = [
       cfg.package
-      reshadeBin
-      reshadeRun
-      reshadePreset
     ];
 
     home.sessionVariables = {

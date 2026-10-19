@@ -426,6 +426,144 @@ MANIFEST_EOF
       substituteInPlace $out/share/vulkan/implicit_layer.d/ReShade64.json \
         --replace-fail '$out' "$out"
 
+      # Create single unified reshade launcher command
+      mkdir -p $out/bin
+      cat << 'RUNNER_EOF' > $out/bin/reshade
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_RESHADE_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/reshade"
+CONFIGS_DIR="$BASE_RESHADE_DIR/configurations"
+
+show_help() {
+  cat << "HELP"
+reshade - Native ReShade launcher for Linux Vulkan
+
+USAGE:
+  reshade [OPTIONS] <command> [args...]
+  reshade %command%                  (Launcher launch options syntax)
+  reshade flatpak run <app-id>       (Flatpak applications)
+
+ENVIRONMENT VARIABLES:
+  RESHADE=1 <command>                Enable ReShade via environment variable
+  RESHADE_ENABLE=1 <command>         Alternative syntax
+  DISABLE_RESHADE=1 <command>        Explicitly disable ReShade
+
+OPTIONS:
+  -p, --profile <NAME>  Set an explicit ReShade profile
+                        (Configs in ~/.local/share/reshade/configurations/<NAME>)
+  -l, --list            List existing profiles and presets
+  -w, --wayland         Enable PROTON_ENABLE_WAYLAND=1 (Wine Wayland native)
+  -n, --no-log          Enable RESHADE_DISABLE_LOGGING=1 (disable log generation)
+  -h, --help            Show this help message
+HELP
+}
+
+list_profiles() {
+  echo "ReShade profiles in $CONFIGS_DIR:"
+  if [ -d "$CONFIGS_DIR" ]; then
+    for p in "$CONFIGS_DIR"/*; do
+      [ -d "$p" ] || continue
+      pname=$(basename "$p")
+      echo "  Profile: $pname"
+      if [ -f "$p/ReShade.ini" ]; then
+        preset=$(grep -E "^PresetPath=" "$p/ReShade.ini" 2>/dev/null | cut -d= -f2- || echo "ReShadePreset.ini")
+        echo "    Active preset: $preset"
+      fi
+      for f in "$p"/*.ini; do
+        [ -e "$f" ] || continue
+        fb=$(basename "$f")
+        [ "$fb" = "ReShade.ini" ] || echo "    - $fb"
+      done
+    done
+  fi
+}
+
+if [ $# -eq 0 ]; then
+  show_help
+  exit 1
+fi
+
+PROFILE=""
+WAYLAND=0
+NO_LOG=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -l|--list|list)
+      list_profiles
+      exit 0
+      ;;
+    -w|--wayland)
+      WAYLAND=1
+      shift
+      ;;
+    -p|--profile)
+      [ -n "''${2:-}" ] || { echo "Error: --profile requires a name." >&2; exit 1; }
+      PROFILE="$2"
+      shift 2
+      ;;
+    -n|--no-log)
+      NO_LOG=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+[ $# -gt 0 ] || { echo "Error: No command specified." >&2; exit 1; }
+
+mkdir -p "$CONFIGS_DIR"
+
+if [ -n "$PROFILE" ]; then
+  export RESHADE_PROFILE="$PROFILE"
+fi
+
+export RESHADE=1
+export RESHADE_ENABLE=1
+export VK_LOADER_LAYERS_DISABLE="''${VK_LOADER_LAYERS_DISABLE:+''$VK_LOADER_LAYERS_DISABLE:}VK_LAYER_reshade_x86_64"
+export XDG_DATA_DIRS="@OUT@/share''${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+[ "$WAYLAND" -eq 1 ] && export PROTON_ENABLE_WAYLAND=1
+[ "$NO_LOG" -eq 1 ] && export RESHADE_DISABLE_LOGGING=1
+
+# Flatpak compatibility
+if [ "$(basename "$1")" = "flatpak" ]; then
+  FLATPAK_ARGS=()
+  FOUND_RUN=0
+  for arg in "$@"; do
+    FLATPAK_ARGS+=("$arg")
+    if [ "$arg" = "run" ] && [ "$FOUND_RUN" -eq 0 ]; then
+      FOUND_RUN=1
+      FLATPAK_ARGS+=(
+        "--env=VK_ADD_LAYER_PATH=$HOME/.local/share/vulkan/implicit_layer.d"
+        "--env=RESHADE=1"
+        "--env=RESHADE_ENABLE=1"
+        "--filesystem=$BASE_RESHADE_DIR:rw"
+        "--filesystem=$HOME/.local/share/vulkan:ro"
+      )
+      [ -n "$PROFILE" ] && FLATPAK_ARGS+=("--env=RESHADE_PROFILE=$PROFILE")
+      [ "$NO_LOG" -eq 1 ] && FLATPAK_ARGS+=("--env=RESHADE_DISABLE_LOGGING=1")
+    fi
+  done
+  exec "''${FLATPAK_ARGS[@]}"
+fi
+
+exec "$@"
+RUNNER_EOF
+
+      substituteInPlace $out/bin/reshade --replace-fail '@OUT@' "$out"
+      chmod +x $out/bin/reshade
+
       runHook postInstall
     '';
 
@@ -434,5 +572,6 @@ MANIFEST_EOF
       homepage = "https://github.com/Cleison-oliveira/nix-reshade-manager";
       license = licenses.bsd3;
       platforms = platforms.linux;
+      mainProgram = "reshade";
     };
   }
